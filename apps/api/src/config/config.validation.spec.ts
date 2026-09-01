@@ -17,6 +17,25 @@ describe('validate', () => {
 
     expect(actual.JWT_SECRET).toBe(baseConfig.JWT_SECRET);
     expect(actual.COOKIE_DOMAIN).toBeUndefined();
+    expect(actual.COGNEE_ENABLED).toBe('false');
+  });
+
+  describe('Cognee', () => {
+    it('accepts an enabled integration with an OpenAI token', () => {
+      const inputConfig = {
+        ...baseConfig,
+        COGNEE_ENABLED: 'true',
+        OPENAI_TOKEN: 'test-token',
+      };
+
+      expect(() => validate(inputConfig)).not.toThrow();
+    });
+
+    it('refuses to enable the integration without an OpenAI token', () => {
+      const inputConfig = { ...baseConfig, COGNEE_ENABLED: 'true' };
+
+      expect(() => validate(inputConfig)).toThrow(/OPENAI_TOKEN/);
+    });
   });
 
   it('throws when DATABASE_URL is missing', () => {

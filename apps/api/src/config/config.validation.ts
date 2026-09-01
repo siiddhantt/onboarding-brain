@@ -2,6 +2,7 @@ import { plainToInstance } from 'class-transformer';
 import {
   IsBoolean,
   IsEnum,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -136,6 +137,22 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   R2_PUBLIC_URL?: string;
+
+  @IsIn(['true', 'false'])
+  @IsOptional()
+  COGNEE_ENABLED: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  COGNEE_DATASET_PREFIX: string = 'organization';
+
+  @IsString()
+  @IsOptional()
+  OPENAI_TOKEN?: string;
+
+  @IsString()
+  @IsOptional()
+  OPENAI_MODEL: string = 'gpt-4o-mini';
 }
 
 /**
@@ -174,6 +191,16 @@ function validateProductionSecrets(config: EnvironmentVariables): void {
   }
 }
 
+function validateCogneeConfiguration(config: EnvironmentVariables): void {
+  if (config.COGNEE_ENABLED !== 'true') {
+    return;
+  }
+
+  if (!config.OPENAI_TOKEN?.trim()) {
+    throw new Error('COGNEE_ENABLED=true requires OPENAI_TOKEN');
+  }
+}
+
 export function validate(config: Record<string, unknown>) {
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
     enableImplicitConversion: true,
@@ -188,6 +215,7 @@ export function validate(config: Record<string, unknown>) {
   }
 
   validateProductionSecrets(validatedConfig);
+  validateCogneeConfiguration(validatedConfig);
 
   return validatedConfig;
 }
