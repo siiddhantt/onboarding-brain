@@ -37,6 +37,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.974.0
         version: 3.974.0
+      '@cognee/cognee-ts':
+        specifier: 0.2.0
+        version: 0.2.0
       '@nestjs/common':
         specifier: ^11.0.14
         version: 11.1.9(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -961,6 +964,30 @@ packages:
   '@chevrotain/utils@10.5.0':
     resolution: {integrity: sha512-hBzuU5+JjB2cqNZyszkDHZgOSrUUT8V3dhgRl8Q9Gp6dAj/H5+KILGjbhDpc3Iy9qmqlm/akuOI2ut9VUtzJxQ==}
 
+  '@cognee/cognee-ts@0.2.0':
+    resolution: {integrity: sha512-AFPcKa/xp5uNNMRPxZsjeo03Yypj9r0EW2PteVVU7KlN0Q87SloP+7AdSyD0tlirWUisCnUT82jb4JFhxiSeRg==}
+    engines: {node: '>=16.0.0'}
+
+  '@cognee/neon-darwin-arm64@0.2.0':
+    resolution: {integrity: sha512-r083mPaHEuIrbj9Z9kNV26br2JbceWbx2P1gTGLptVJvse0ri+BpdbwKuCX4BWFy3Fh9V10BWwfK9EGiek/kaA==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@cognee/neon-linux-arm64-gnu@0.2.0':
+    resolution: {integrity: sha512-EDubyHo3ZB+Lmgbinf8Up85uFkKMyh8xlH1++RWBHYiYevjl/6NPblA+eq2EcItqbP8LmfF+B/JbOa9ojCplkw==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@cognee/neon-linux-x64-gnu@0.2.0':
+    resolution: {integrity: sha512-teORJ9wNe7h50WdYjIDCjw3rNfjiWS+KzACYT7pdtpasIVf7JQI8a+uxZVnCKx6qXIfnmpJtlhzz2BHB0sGdcw==}
+    cpu: [x64]
+    os: [linux]
+
+  '@cognee/neon-win32-x64-msvc@0.2.0':
+    resolution: {integrity: sha512-EeK/dmvS3F6B83iHvvYMvEW2wsfSdHrvfbwcWwIeL0wD9btMRWhrquHmaSAkNysUBJndyVACYNQSUI7CwrmJuA==}
+    cpu: [x64]
+    os: [win32]
+
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
@@ -1592,6 +1619,9 @@ packages:
 
   '@napi-rs/wasm-runtime@0.2.12':
     resolution: {integrity: sha512-ZVWUcfwY4E/yPitQJl481FjFo3K22D6qF0DuFH6Y/nbnE11GY5uguDxZMGXPQ8WQ0128MXQD7TnfHyK4oWoIJQ==}
+
+  '@neon-rs/load@0.2.6':
+    resolution: {integrity: sha512-7p8j+guEhGTJNJISgmHO0homqGYAc0SDfmgGZfluMcQnimcceMY87b4hdqufp+7YmsOVC4W/JvT3/Tpi3/gy+Q==}
 
   '@nestjs/cli@11.0.14':
     resolution: {integrity: sha512-YwP03zb5VETTwelXU+AIzMVbEZKk/uxJL+z9pw0mdG9ogAtqZ6/mpmIM4nEq/NU8D0a7CBRLcMYUmWW/55pfqw==}
@@ -8427,6 +8457,28 @@ snapshots:
 
   '@chevrotain/utils@10.5.0': {}
 
+  '@cognee/cognee-ts@0.2.0':
+    dependencies:
+      '@neon-rs/load': 0.2.6
+      dotenv: 16.6.1
+    optionalDependencies:
+      '@cognee/neon-darwin-arm64': 0.2.0
+      '@cognee/neon-linux-arm64-gnu': 0.2.0
+      '@cognee/neon-linux-x64-gnu': 0.2.0
+      '@cognee/neon-win32-x64-msvc': 0.2.0
+
+  '@cognee/neon-darwin-arm64@0.2.0':
+    optional: true
+
+  '@cognee/neon-linux-arm64-gnu@0.2.0':
+    optional: true
+
+  '@cognee/neon-linux-x64-gnu@0.2.0':
+    optional: true
+
+  '@cognee/neon-win32-x64-msvc@0.2.0':
+    optional: true
+
   '@colors/colors@1.5.0':
     optional: true
 
@@ -9129,6 +9181,8 @@ snapshots:
       '@emnapi/runtime': 1.7.1
       '@tybys/wasm-util': 0.10.1
     optional: true
+
+  '@neon-rs/load@0.2.6': {}
 
   '@nestjs/cli@11.0.14(@types/node@22.20.1)':
     dependencies:

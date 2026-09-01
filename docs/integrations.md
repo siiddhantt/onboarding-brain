@@ -17,6 +17,7 @@ For who to host these with, see [providers.md](providers.md).
 | [Mailpit](#mailpit-local-email)       | Local only     | Development email has nowhere to go             |
 | [Google OAuth](#google-oauth)         | No             | "Sign in with Google" fails; other auth is fine |
 | [Object storage](#object-storage)     | No             | Files are written to local disk                 |
+| [Cognee](#cognee-knowledge-layer)     | No             | Knowledge ingestion and search are unavailable  |
 | [Custom domains](#custom-domains-dns) | No             | Tenants use the main app domain                 |
 | [Local HTTPS](#local-https)           | No             | Development runs over HTTP                      |
 
@@ -24,6 +25,51 @@ PostgreSQL and Redis are both required. Only `DATABASE_URL` and `JWT_SECRET`
 are _validated_ at startup, so a missing Redis host lets the API boot and then
 fails at the first sign-in. Being unvalidated is not the same as being
 optional — read the notes below before leaving a value blank.
+
+---
+
+## Cognee knowledge layer
+
+The API includes an optional backend boundary around `@cognee/cognee-ts` for
+ingesting text and searching an organization's knowledge graph. It is disabled
+by default, so the starter still boots and all non-AI features work without an
+LLM account.
+
+**Where:** `apps/api/.env`
+
+```bash
+COGNEE_ENABLED=true
+COGNEE_DATASET_PREFIX=organization
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TOKEN=<your OpenAI API key>
+```
+
+The service derives the dataset name from the authenticated organization ID
+(`organization-<organization-id>`) and supplies the same ID as Cognee's tenant
+when ingesting. Search callers cannot choose an arbitrary dataset; every query
+is restricted to the requesting organization's dataset.
+
+The SDK is loaded and warmed only on the first Cognee operation. This keeps the
+dependency optional at runtime and avoids paying initialization cost on API
+processes that never use the knowledge layer.
+
+This package is Cognee's **embedded TypeScript SDK**, backed by a native runtime.
+It is not a connector to Cognee Cloud. If the project chooses the hosted route,
+the implementation behind `CogneeService` should be swapped while preserving
+its organization-scoped interface.
+
+No HTTP endpoint is exposed yet. Product flows such as document upload and
+onboarding Q&A should inject `CogneeService` into their own modules once their
+authorization and response contracts are defined.
+
+**Without it:** calls to `CogneeService` fail with a service-unavailable error;
+the rest of the API is unaffected.
+
+**Verify the boundary without making an external AI call:**
+
+```bash
+pnpm --filter @app-starter/api test -- cognee.service.spec.ts
+```
 
 ---
 
