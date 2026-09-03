@@ -20,6 +20,7 @@ import { DomainMappingForm } from '@/components/organizations/DomainMappingForm'
 import { organizationsApi } from '@/lib/organizations-api';
 import { domainMappingsApi } from '@/lib/domain-mappings-api';
 import { authStorage } from '@/lib/auth-storage';
+import { DepartmentsSettingsPanel } from '@/components/departments/DepartmentsSettingsPanel';
 
 interface PageProps {
   params: Promise<{ organizationId: string }>;
@@ -75,6 +76,7 @@ export default function OrganizationSettingsPage({ params }: PageProps) {
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="members">Members</TabsTrigger>
+            <TabsTrigger value="departments">Departments</TabsTrigger>
             <TabsTrigger value="domains">Domains</TabsTrigger>
           </TabsList>
 
@@ -130,6 +132,14 @@ export default function OrganizationSettingsPage({ params }: PageProps) {
             />
 
             {canManage && <OrganizationPendingInvitesCard organizationId={organizationId} />}
+          </TabsContent>
+
+          <TabsContent value="departments" className="space-y-6 pt-6">
+            <DepartmentsSettingsPanel
+              organizationId={organizationId}
+              members={members?.users ?? []}
+              canManage={canManage}
+            />
           </TabsContent>
 
           <TabsContent value="domains" className="space-y-6 pt-6">

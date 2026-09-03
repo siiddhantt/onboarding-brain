@@ -155,6 +155,8 @@ model Organization {
   notificationPreferences NotificationPreference[]
   projects                Project[]
   knowledgeSources        KnowledgeSource[]
+  departments             Department[]
+  departmentContacts      DepartmentContact[]
 
   @@map("organizations")
 }
@@ -166,8 +168,9 @@ model OrganizationMember {
   role           OrgRole
   createdAt      DateTime @default(now()) @db.Timestamptz(6)
 
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  departmentContacts DepartmentContact[]
 
   @@unique([userId, organizationId])
   @@index([userId])
@@ -418,6 +421,41 @@ model KnowledgeSource {
   @@index([organizationId, status])
   @@index([providerReference])
   @@map("knowledge_sources")
+}
+
+model Department {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  name           String
+  slug           String
+  description    String?
+  archivedAt     DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(6)
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacts     DepartmentContact[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, archivedAt, name])
+  @@map("departments")
+}
+
+model DepartmentContact {
+  id                   String   @id @default(uuid())
+  organizationId       String   @map("organization_id")
+  departmentId         String   @map("department_id")
+  organizationMemberId String   @map("organization_member_id")
+  createdAt            DateTime @default(now()) @db.Timestamptz(6)
+
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department         Department         @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  organizationMember OrganizationMember @relation(fields: [organizationMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, organizationMemberId])
+  @@index([organizationId, departmentId])
+  @@index([organizationMemberId])
+  @@map("department_contacts")
 }
 
 // ============================================================================

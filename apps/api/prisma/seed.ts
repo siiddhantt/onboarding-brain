@@ -1,7 +1,7 @@
 /**
  * Development seed.
  *
- * Creates one demo organization with an owner, a member, and two projects.
+ * Creates one demo organization with members, departments, contacts, and two projects.
  *
  * Idempotent — safe to run repeatedly. Records upsert on their natural keys,
  * so re-running updates rather than duplicates.
@@ -84,14 +84,72 @@ async function seedDemoOrganization() {
     },
   });
 
+  const memberships = new Map<string, string>();
   for (const [user, role] of [
     [owner, OrgRole.OWNER],
     [member, OrgRole.MEMBER],
   ] as const) {
-    await prisma.organizationMember.upsert({
+    const membership = await prisma.organizationMember.upsert({
       where: { userId_organizationId: { userId: user.id, organizationId: organization.id } },
       update: { role },
       create: { userId: user.id, organizationId: organization.id, role },
+    });
+    memberships.set(user.id, membership.id);
+  }
+
+  const departments = [
+    {
+      slug: 'people-operations',
+      name: 'People Operations',
+      description: 'Onboarding, benefits, time off, and workplace policies.',
+      contactUserId: owner.id,
+    },
+    {
+      slug: 'finance',
+      name: 'Finance',
+      description: 'Expenses, purchasing, reimbursements, and company cards.',
+      contactUserId: member.id,
+    },
+  ];
+
+  for (const departmentData of departments) {
+    const department = await prisma.department.upsert({
+      where: {
+        organizationId_slug: {
+          organizationId: organization.id,
+          slug: departmentData.slug,
+        },
+      },
+      update: {
+        name: departmentData.name,
+        description: departmentData.description,
+        archivedAt: null,
+      },
+      create: {
+        organizationId: organization.id,
+        slug: departmentData.slug,
+        name: departmentData.name,
+        description: departmentData.description,
+      },
+    });
+    const organizationMemberId = memberships.get(departmentData.contactUserId);
+    if (!organizationMemberId) {
+      throw new Error(`Missing membership for department contact ${departmentData.contactUserId}`);
+    }
+
+    await prisma.departmentContact.upsert({
+      where: {
+        departmentId_organizationMemberId: {
+          departmentId: department.id,
+          organizationMemberId,
+        },
+      },
+      update: {},
+      create: {
+        organizationId: organization.id,
+        departmentId: department.id,
+        organizationMemberId,
+      },
     });
   }
 
@@ -118,7 +176,9 @@ async function seedDemoOrganization() {
     });
   }
 
-  console.log(`Seeded organization "${organization.name}" with 2 users and 2 projects`);
+  console.log(
+    `Seeded organization "${organization.name}" with 2 users, 2 departments, and 2 projects`,
+  );
   console.log(`  owner@example.com / ${DEMO_PASSWORD}  (global admin)`);
   console.log(`  member@example.com / ${DEMO_PASSWORD}`);
 }
