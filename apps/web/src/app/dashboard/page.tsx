@@ -41,7 +41,7 @@ export default function DashboardPage() {
         <EmptyState
           icon={Building2}
           title="Create your first organization"
-          description="Organizations own your projects and members."
+          description="Organizations keep their members and onboarding knowledge separate."
           action={
             <Button asChild>
               <Link href="/organizations/create">Create an organization</Link>
