@@ -20,9 +20,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = headersList.get('host') || '';
 
   const defaultMetadata: Metadata = {
-    title: 'App Starter',
-    description:
-      'A multi-tenant SaaS starter with authentication, organizations, and invites already wired up.',
+    title: 'Onboarding Brain',
+    description: 'Source-backed answers from the onboarding knowledge your organization provides.',
     icons: {
       icon: '/images/favicon.png',
     },

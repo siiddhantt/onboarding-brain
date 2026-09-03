@@ -1,37 +1,34 @@
 import Link from 'next/link';
-import { Bell, Building2, Globe, Users } from 'lucide-react';
+import { BrainCircuit, Building2, FileText, MessageSquareText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UniversalLayout } from '@/components/layout/UniversalLayout';
 
 export const metadata = {
-  title: 'App Starter',
-  description:
-    'A multi-tenant SaaS starter with authentication, organizations, custom domains, and notifications.',
+  title: 'Onboarding Brain',
+  description: 'Source-backed answers from the onboarding knowledge your organization provides.',
 };
 
 const CAPABILITIES = [
   {
-    icon: Users,
-    title: 'Auth and organizations',
-    description:
-      'Email, OTP, and Google sign-in. Organizations with owner, admin, and member roles, invites, and impersonation with an audit trail.',
+    icon: FileText,
+    title: 'Bring your onboarding knowledge',
+    description: 'Add the policies, handbooks, and process documents your team already maintains.',
   },
   {
-    icon: Bell,
-    title: 'Notifications',
-    description:
-      'Email and in-app delivery, with per-user channel preferences and per-tenant sender identity.',
-  },
-  {
-    icon: Globe,
-    title: 'Custom domains',
-    description: 'Per-tenant domains with DNS verification and white-label branding.',
+    icon: MessageSquareText,
+    title: 'Ask grounded questions',
+    description: 'Get concise answers tied to the source material instead of unsupported guesses.',
   },
   {
     icon: Building2,
-    title: 'A worked example',
+    title: 'Keep company context separate',
+    description: 'Members and knowledge are scoped to the organization they belong to.',
+  },
+  {
+    icon: BrainCircuit,
+    title: 'Build a shared company memory',
     description:
-      'Projects show the full pattern — tenant scoping, role guards, visibility — in a form small enough to read and replace.',
+      'Capture reviewed answers so the onboarding brain can improve as the team uses it.',
   },
 ];
 
@@ -45,15 +42,15 @@ export default function HomePage() {
       <main className="mx-auto max-w-5xl px-4 py-20">
         <section className="space-y-6 text-center">
           <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-            Ship the SaaS, not the scaffolding
+            Answers new teammates can trust
           </h1>
           <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-            A production-shaped starter: NestJS and Next.js in a Turborepo, with multi-tenancy,
-            custom domains, and notifications already wired together. Billing is left to you.
+            Bring onboarding documents into one company brain and answer questions from the
+            knowledge your team provides, with sources.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <Button asChild size="lg">
-              <Link href="/login">Get started</Link>
+              <Link href="/login">Open your workspace</Link>
             </Button>
           </div>
         </section>
