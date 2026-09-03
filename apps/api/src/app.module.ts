@@ -19,6 +19,7 @@ import { AdminImpersonationModule } from './admin-impersonation/admin-impersonat
 import { AdminDashboardModule } from './admin-dashboard/admin-dashboard.module';
 import { ProjectsModule } from './projects/projects.module';
 import { CompanyBrainModule } from './company-brain/company-brain.module';
+import { DepartmentsModule } from './departments/departments.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { CompanyBrainModule } from './company-brain/company-brain.module';
     AdminDashboardModule,
     ProjectsModule,
     CompanyBrainModule,
+    DepartmentsModule,
   ],
   controllers: [AppController],
   providers: [

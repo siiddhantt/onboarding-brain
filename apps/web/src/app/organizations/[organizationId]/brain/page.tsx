@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { companyBrainApi } from '@/lib/company-brain-api';
 import { organizationsApi } from '@/lib/organizations-api';
+import { DepartmentDirectory } from '@/components/departments/DepartmentDirectory';
+import { departmentsApi } from '@/lib/departments-api';
 
 interface PageProps {
   params: Promise<{ organizationId: string }>;
@@ -34,6 +36,10 @@ export default function CompanyBrainPage({ params }: PageProps) {
     queryKey: ['organization-role', organizationId],
     queryFn: () => organizationsApi.getUserRoleInOrganization(organizationId),
   });
+  const departmentsQuery = useQuery({
+    queryKey: ['departments', organizationId],
+    queryFn: () => departmentsApi.list(organizationId),
+  });
   const uploadMutation = useMutation({
     mutationFn: (file: File) => companyBrainApi.uploadDocument(organizationId, file),
     onSuccess: async (source) => {
@@ -46,8 +52,13 @@ export default function CompanyBrainPage({ params }: PageProps) {
     },
   });
 
-  const isLoading = statusQuery.isLoading || sourcesQuery.isLoading || roleQuery.isLoading;
-  const hasLoadError = statusQuery.isError || sourcesQuery.isError || roleQuery.isError;
+  const isLoading =
+    statusQuery.isLoading ||
+    sourcesQuery.isLoading ||
+    roleQuery.isLoading ||
+    departmentsQuery.isLoading;
+  const hasLoadError =
+    statusQuery.isError || sourcesQuery.isError || roleQuery.isError || departmentsQuery.isError;
   const isConfigured = statusQuery.data?.isConfigured ?? false;
   const canManage = roleQuery.data?.role === 'OWNER' || roleQuery.data?.role === 'ADMIN';
 
@@ -108,6 +119,8 @@ export default function CompanyBrainPage({ params }: PageProps) {
             }}
           />
         </div>
+
+        <DepartmentDirectory departments={departmentsQuery.data?.items ?? []} />
       </div>
     </PageContainer>
   );

@@ -12,3 +12,6 @@ export * from './organization.types';
 
 // Company brain types
 export * from './company-brain.types';
+
+// Department types
+export * from './department.types';
