@@ -58,6 +58,7 @@ model User {
   notificationPreferences NotificationPreference[]
   inAppNotifications      InAppNotification[]
   createdProjects         Project[]                @relation("ProjectCreator")
+  createdKnowledgeSources KnowledgeSource[]        @relation("KnowledgeSourceCreator")
 
   adminImpersonationAudits AdminImpersonationAudit[] @relation("AdminImpersonationTargetUser")
   quarantinedAudits        AdminQuarantineAudit[]    @relation("QuarantinedUser")
@@ -153,6 +154,7 @@ model Organization {
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
   projects                Project[]
+  knowledgeSources        KnowledgeSource[]
 
   @@map("organizations")
 }
@@ -382,6 +384,40 @@ model ShortLink {
 
   @@index([slug])
   @@map("short_links")
+}
+
+// ============================================================================
+// Company brain
+// ============================================================================
+
+enum KnowledgeSourceStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+model KnowledgeSource {
+  id                String                @id @default(uuid())
+  organizationId    String                @map("organization_id")
+  createdById       String                @map("created_by_id")
+  sourceType        String                @default("DOCUMENT") @map("source_type")
+  name              String
+  mimeType          String?               @map("mime_type")
+  sizeBytes         Int?                  @map("size_bytes")
+  status            KnowledgeSourceStatus @default(PROCESSING)
+  providerReference String?               @map("provider_reference")
+  errorMessage      String?               @map("error_message")
+  archivedAt        DateTime?             @map("archived_at") @db.Timestamptz(6)
+  createdAt         DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime              @updatedAt @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("KnowledgeSourceCreator", fields: [createdById], references: [id])
+
+  @@index([organizationId, archivedAt, createdAt])
+  @@index([organizationId, status])
+  @@index([providerReference])
+  @@map("knowledge_sources")
 }
 
 // ============================================================================

@@ -3,7 +3,7 @@
 import { use, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { FolderOpen, Loader2, Plus, Settings, UserPlus } from 'lucide-react';
+import { BrainCircuit, FolderOpen, Loader2, Plus, Settings, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -79,6 +79,25 @@ export default function OrganizationPage({ params }: PageProps) {
             </Button>
           </div>
         </PageHeader>
+
+        <Card className="border-primary/30 bg-primary/[0.03]">
+          <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
+              <div className="rounded-md bg-primary/10 p-2 text-primary">
+                <BrainCircuit className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Company brain</CardTitle>
+                <CardDescription className="mt-1">
+                  Add onboarding knowledge and ask grounded questions.
+                </CardDescription>
+              </div>
+            </div>
+            <Button asChild size="sm">
+              <Link href={`/organizations/${organizationId}/brain`}>Open company brain</Link>
+            </Button>
+          </CardHeader>
+        </Card>
 
         <section className="space-y-4">
           <div className="flex items-center justify-between gap-4">
