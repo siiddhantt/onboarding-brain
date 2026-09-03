@@ -4,6 +4,7 @@
 // Constants
 export * from './constants/validation';
 export * from './constants/rich-text';
+export * from './constants/knowledge';
 
 // Enums
 export * from './enums/org-role.enum';

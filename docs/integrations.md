@@ -44,7 +44,7 @@ OPENAI_MODEL=gpt-4o-mini
 OPENAI_TOKEN=<your OpenAI API key>
 ```
 
-The service derives the dataset name from the authenticated organization ID
+The adapter derives the dataset name from the authenticated organization ID
 (`organization-<organization-id>`) and supplies the same ID as Cognee's tenant
 when ingesting. Search callers cannot choose an arbitrary dataset; every query
 is restricted to the requesting organization's dataset.
@@ -54,21 +54,24 @@ dependency optional at runtime and avoids paying initialization cost on API
 processes that never use the knowledge layer.
 
 This package is Cognee's **embedded TypeScript SDK**, backed by a native runtime.
-It is not a connector to Cognee Cloud. If the project chooses the hosted route,
-the implementation behind `CogneeService` should be swapped while preserving
-its organization-scoped interface.
+It is not a connector to Cognee Cloud. The product depends on the
+provider-neutral `KnowledgeEngine` interface, so a hosted adapter can replace
+the embedded runtime without changing the company-brain routes or web app. See
+[ADR 0010](adr/0010-provider-neutral-knowledge-engine.md).
 
-No HTTP endpoint is exposed yet. Product flows such as document upload and
-onboarding Q&A should inject `CogneeService` into their own modules once their
-authorization and response contracts are defined.
+The company-brain page supports organization-scoped Q&A and document ingestion.
+Owners and admins may upload PDF, DOCX, TXT, Markdown, and HTML files up to 10
+MB; every organization member may ask questions and view the source list.
+Provider failures are recorded as a failed source without exposing internal
+error details.
 
-**Without it:** calls to `CogneeService` fail with a service-unavailable error;
-the rest of the API is unaffected.
+**Without it:** the page remains visible but clearly disables uploads and Q&A;
+the rest of the application is unaffected.
 
 **Verify the boundary without making an external AI call:**
 
 ```bash
-pnpm --filter @app-starter/api test -- cognee.service.spec.ts
+pnpm --filter @app-starter/api test -- cognee.service.spec.ts company-brain.service.spec.ts
 ```
 
 ---

@@ -9,3 +9,6 @@ export * from './auth.types';
 
 // Organization types
 export * from './organization.types';
+
+// Company brain types
+export * from './company-brain.types';
