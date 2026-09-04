@@ -7,6 +7,16 @@ jest.mock('../CompanyBrainMarkdown', () => ({
 }));
 
 describe('QuestionAnswerPanel', () => {
+  it('keeps the conversation scrollable while the composer stays pinned in the card', () => {
+    render(<QuestionAnswerPanel isConfigured onAsk={jest.fn()} />);
+
+    expect(screen.getByRole('region', { name: 'Conversation history' })).toHaveClass(
+      'flex-1',
+      'overflow-y-auto',
+    );
+    expect(screen.getByLabelText('Question').closest('form')).toHaveClass('shrink-0');
+  });
+
   it('submits a trimmed question and renders its source-backed answer', async () => {
     const user = userEvent.setup();
     const onAsk = jest.fn().mockResolvedValue({

@@ -51,14 +51,22 @@ export function UnifiedHeader({
             brandName={customLogoUrl ? '' : 'Onboarding Brain'}
             logoHeight={logoHeight}
             isCustomLogo={!!customLogoUrl}
-            className={customLogoUrl && !logoHeight ? 'max-h-10 w-auto' : ''}
+            className={
+              customLogoUrl && !logoHeight
+                ? 'max-h-10 w-auto'
+                : !customLogoUrl
+                  ? '[&>span]:max-[420px]:hidden'
+                  : ''
+            }
           />
         </div>
 
-        <HeaderActions className="gap-3">
+        <HeaderActions className="gap-1 sm:gap-3">
           {showAuthenticatedUI ? (
             <>
-              <NotificationCenter />
+              <div className="hidden sm:block">
+                <NotificationCenter />
+              </div>
               <ThemeToggle />
               <UserProfileMenu />
             </>

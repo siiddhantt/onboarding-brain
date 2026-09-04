@@ -45,7 +45,7 @@ const HeaderBrand = ({
           style={logoHeight ? { height: `${logoHeight}px`, maxHeight: '40px' } : undefined}
         />
       )}
-      {brandName != null && <span className="text-lg font-bold">{brandName}</span>}
+      {brandName != null && <span className="text-base font-bold sm:text-lg">{brandName}</span>}
     </Component>
   );
 };

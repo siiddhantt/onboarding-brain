@@ -45,6 +45,20 @@ export default function VerifyEmailPendingPage() {
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>Please check your email and click the verification link to activate your account.</p>
             <p>The link will expire in 24 hours.</p>
+            {process.env.NODE_ENV === 'development' && (
+              <p className="rounded-lg border bg-muted/30 px-3 py-2 text-xs leading-5">
+                Running locally? Open{' '}
+                <a
+                  href="http://localhost:8025"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-foreground underline underline-offset-4"
+                >
+                  the development inbox
+                </a>{' '}
+                to find this message.
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Button onClick={handleResend} className="w-full" disabled={isResending}>

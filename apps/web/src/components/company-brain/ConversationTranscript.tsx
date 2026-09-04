@@ -24,7 +24,7 @@ interface ConversationTranscriptProps {
 export function ConversationTranscript({ turns, onOpenDirectory }: ConversationTranscriptProps) {
   if (turns.length === 0) {
     return (
-      <div className="flex min-h-[22rem] flex-col items-center justify-center px-6 py-12 text-center">
+      <div className="flex h-full min-h-0 flex-col items-center justify-center px-6 py-10 text-center">
         <div className="mb-4 rounded-xl border bg-muted/40 p-3 text-muted-foreground">
           <BrainCircuit className="h-6 w-6" />
         </div>
@@ -42,7 +42,7 @@ export function ConversationTranscript({ turns, onOpenDirectory }: ConversationT
       role="log"
       aria-label="Company brain conversation"
       aria-relevant="additions text"
-      className="space-y-7 px-4 py-6 sm:px-6"
+      className="space-y-7 px-4 py-5 sm:px-6 sm:py-6"
     >
       {turns.map((turn) => (
         <li key={turn.id} className="space-y-5">

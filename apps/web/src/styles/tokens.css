@@ -91,24 +91,24 @@
 /* Dark mode – same token names, different values. Apply .dark on a parent (e.g. html). */
 .dark {
   /* Primary (neutral theme) */
-  --color-forest: #f9fafb;
+  --color-forest: #fafafa;
   --color-growth: #e5e7eb;
-  --color-leaf: #9ca3af;
-  --color-spring: #111827;
+  --color-leaf: #a3a3a3;
+  --color-spring: #171717;
 
   /* Neutral */
-  --color-soil: #f3f4f6;
-  --color-stem: #9ca3af;
-  --color-mist: #263244;
-  --color-dew: #0b1220;
+  --color-soil: #f5f5f5;
+  --color-stem: #a3a3a3;
+  --color-mist: #2e2e2e;
+  --color-dew: #0a0a0a;
 
   /* Accent */
-  --color-bloom: #f9fafb;
-  --color-rain: #d1d5db;
-  --color-autumn: #f9fafb;
+  --color-bloom: #fafafa;
+  --color-rain: #d4d4d4;
+  --color-autumn: #fafafa;
 
   /* Semantic: text/UI on dark backgrounds */
-  --color-on-dark: #f3f4f6;
+  --color-on-dark: #f5f5f5;
 
   /* Primary button: always dark bg + light text */
   --color-primary-bg: var(--color-dew);

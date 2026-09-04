@@ -27,19 +27,19 @@
   }
 
   .dark {
-    --background-rgb: 11 18 32;
-    --foreground-rgb: 243 244 246; /* soil (dark) */
-    --primary-rgb: 243 244 246;
-    --primary-foreground-rgb: 15 23 42;
-    --muted-rgb: 30 41 59;
-    --muted-foreground-rgb: 148 163 184;
-    --border-rgb: 38 50 68;
-    --card-rgb: 17 24 39;
-    --accent-rgb: 30 41 59;
-    --accent-foreground-rgb: 243 244 246;
-    --sidebar-rgb: 17 24 39;
-    --sidebar-foreground-rgb: 243 244 246;
-    --sidebar-border-rgb: 38 50 68;
+    --background-rgb: 10 10 10;
+    --foreground-rgb: 245 245 245; /* soil (dark) */
+    --primary-rgb: 245 245 245;
+    --primary-foreground-rgb: 23 23 23;
+    --muted-rgb: 35 35 35;
+    --muted-foreground-rgb: 163 163 163;
+    --border-rgb: 46 46 46;
+    --card-rgb: 20 20 20;
+    --accent-rgb: 38 38 38;
+    --accent-foreground-rgb: 245 245 245;
+    --sidebar-rgb: 17 17 17;
+    --sidebar-foreground-rgb: 229 229 229;
+    --sidebar-border-rgb: 46 46 46;
     /* Destructive dark (from tokens.css .dark --color-destructive) */
     --destructive-rgb: 248 113 113;
   }

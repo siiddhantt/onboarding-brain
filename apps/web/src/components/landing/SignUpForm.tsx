@@ -33,6 +33,20 @@ export function SignUpForm({ onSwitchToLogin }: SignUpFormProps) {
           <PasswordSignUpForm />
         </TabsContent>
       </Tabs>
+      {process.env.NODE_ENV === 'development' && (
+        <p className="mt-4 rounded-lg border bg-muted/30 px-3 py-2 text-xs leading-5 text-muted-foreground">
+          Local development: verification emails and one-time codes appear in{' '}
+          <a
+            href="http://localhost:8025"
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-foreground underline underline-offset-4"
+          >
+            the development inbox
+          </a>
+          .
+        </p>
+      )}
       {onSwitchToLogin && (
         <div className="text-center text-sm text-muted-foreground mt-4">
           Already have an account?{' '}

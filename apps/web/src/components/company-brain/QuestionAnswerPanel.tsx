@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import type { CompanyBrainAnswer } from '@app-starter/shared';
 import {
   MAX_COMPANY_BRAIN_QUESTION_CHARACTERS,
@@ -34,6 +34,14 @@ export function QuestionAnswerPanel({
   const [isAsking, setIsAsking] = useState(false);
   const nextTurnId = useRef(1);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const transcript = transcriptRef.current;
+    if (transcript) {
+      transcript.scrollTop = transcript.scrollHeight;
+    }
+  }, [turns]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -89,17 +97,27 @@ export function QuestionAnswerPanel({
   };
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="border-b bg-muted/20">
+    <Card className="flex h-[clamp(24rem,calc(100svh-17rem),48rem)] flex-col overflow-hidden">
+      <CardHeader className="shrink-0 border-b bg-muted/20">
         <CardTitle className="text-lg">Ask the company brain</CardTitle>
         <CardDescription>
           Answers are grounded in this organization&apos;s indexed knowledge.
         </CardDescription>
       </CardHeader>
-      <CardContent className="p-0">
-        <ConversationTranscript turns={turns} onOpenDirectory={onOpenDirectory} />
+      <CardContent className="flex min-h-0 flex-1 flex-col p-0">
+        <div
+          ref={transcriptRef}
+          role="region"
+          aria-label="Conversation history"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        >
+          <ConversationTranscript turns={turns} onOpenDirectory={onOpenDirectory} />
+        </div>
 
-        <form onSubmit={handleSubmit} className="border-t bg-card p-4 sm:p-5">
+        <form
+          onSubmit={handleSubmit}
+          className="shrink-0 border-t bg-card/95 p-3 shadow-[0_-8px_24px_rgba(0,0,0,0.04)] backdrop-blur sm:p-5"
+        >
           <div className="rounded-xl border bg-background p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
             <Label htmlFor="company-brain-question" className="sr-only">
               Question

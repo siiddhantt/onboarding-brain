@@ -12,14 +12,14 @@ interface DepartmentDirectoryProps {
 export const DepartmentDirectory = ({ departments, manageHref }: DepartmentDirectoryProps) => (
   <Card className="overflow-hidden">
     <CardHeader className="border-b bg-muted/20 sm:flex-row sm:items-start sm:justify-between sm:space-y-0">
-      <div className="space-y-1.5">
+      <div className="min-w-0 space-y-1.5">
         <CardTitle className="text-lg">Department directory</CardTitle>
         <CardDescription>
           Find the team responsible when company knowledge is missing.
         </CardDescription>
       </div>
       {manageHref && (
-        <Button variant="outline" size="sm" asChild>
+        <Button variant="outline" size="sm" className="w-fit self-start" asChild>
           <Link href={manageHref}>
             <Settings2 className="mr-2 h-4 w-4" />
             Manage
@@ -27,7 +27,7 @@ export const DepartmentDirectory = ({ departments, manageHref }: DepartmentDirec
         </Button>
       )}
     </CardHeader>
-    <CardContent className="p-5 sm:p-6">
+    <CardContent className="p-3.5 sm:p-6">
       {departments.length === 0 ? (
         <div className="rounded-lg border border-dashed px-4 py-10 text-center">
           <Building2 className="mx-auto mb-3 h-5 w-5 text-muted-foreground" />
@@ -37,15 +37,17 @@ export const DepartmentDirectory = ({ departments, manageHref }: DepartmentDirec
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
           {departments.map((department) => (
-            <section key={department.id} className="rounded-lg border bg-card p-4">
+            <section key={department.id} className="min-w-0 rounded-lg border bg-card p-3.5 sm:p-4">
               <div className="flex gap-3">
-                <div className="rounded-md bg-muted p-2 text-muted-foreground">
+                <div className="self-start rounded-md bg-muted p-2 text-muted-foreground">
                   <Building2 className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 space-y-1">
-                  <h3 className="font-medium">{department.name}</h3>
+                  <h3 className="break-words text-base font-semibold leading-6">
+                    {department.name}
+                  </h3>
                   {department.description && (
                     <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
                       {department.description}
