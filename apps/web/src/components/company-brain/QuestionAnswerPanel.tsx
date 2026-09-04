@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react';
 import type { CompanyBrainAnswer } from '@app-starter/shared';
 import {
   MAX_COMPANY_BRAIN_QUESTION_CHARACTERS,
@@ -8,14 +15,15 @@ import {
 } from '@app-starter/shared';
 import { Loader2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   ConversationTranscript,
   type ConversationResponse,
   type ConversationTurn,
 } from './ConversationTranscript';
+
+const COMPOSER_MIN_HEIGHT_PX = 44;
+const COMPOSER_MAX_HEIGHT_PX = 160;
 
 interface QuestionAnswerPanelProps {
   isConfigured: boolean;
@@ -42,6 +50,16 @@ export function QuestionAnswerPanel({
       transcript.scrollTop = transcript.scrollHeight;
     }
   }, [turns]);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+    const contentHeight = Math.max(textarea.scrollHeight, COMPOSER_MIN_HEIGHT_PX);
+    textarea.style.height = `${Math.min(contentHeight, COMPOSER_MAX_HEIGHT_PX)}px`;
+    textarea.style.overflowY = contentHeight > COMPOSER_MAX_HEIGHT_PX ? 'auto' : 'hidden';
+  }, [question]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -97,80 +115,73 @@ export function QuestionAnswerPanel({
   };
 
   return (
-    <Card className="flex h-[clamp(24rem,calc(100svh-17rem),48rem)] flex-col overflow-hidden">
-      <CardHeader className="shrink-0 border-b bg-muted/20">
-        <CardTitle className="text-lg">Ask the company brain</CardTitle>
-        <CardDescription>
-          Answers are grounded in this organization&apos;s indexed knowledge.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-        <div
-          ref={transcriptRef}
-          role="region"
-          aria-label="Conversation history"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
-        >
-          <ConversationTranscript turns={turns} onOpenDirectory={onOpenDirectory} />
-        </div>
+    <section
+      aria-label="Company brain chat"
+      className="-mb-12 flex h-[calc(100dvh-18rem)] min-h-96 flex-col"
+    >
+      <div
+        ref={transcriptRef}
+        role="region"
+        aria-label="Conversation history"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      >
+        <ConversationTranscript turns={turns} onOpenDirectory={onOpenDirectory} />
+      </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="shrink-0 border-t bg-card/95 p-3 shadow-[0_-8px_24px_rgba(0,0,0,0.04)] backdrop-blur sm:p-5"
-        >
-          <div className="rounded-xl border bg-background p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-            <Label htmlFor="company-brain-question" className="sr-only">
-              Question
-            </Label>
-            <Textarea
-              ref={textareaRef}
-              id="company-brain-question"
-              value={question}
-              onChange={(event) => {
-                setQuestion(event.target.value);
-                setInputError(null);
-              }}
-              onKeyDown={handleKeyDown}
-              rows={2}
-              maxLength={MAX_COMPANY_BRAIN_QUESTION_CHARACTERS}
-              placeholder="How do I submit an expense report?"
-              disabled={!isConfigured || isAsking}
-              aria-describedby="company-brain-question-error"
-              className="min-h-[4.5rem] resize-none border-0 bg-transparent p-2 shadow-none focus-visible:ring-0"
-            />
-            <div className="flex items-center justify-between gap-3 px-2 pt-2">
-              <p className="text-xs text-muted-foreground">
-                <span className="hidden sm:inline">
-                  Enter to send · Shift + Enter for a new line
-                </span>
-                <span className="sm:hidden">Ask company knowledge</span>
-              </p>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={!isConfigured || isAsking || question.trim().length === 0}
-                aria-label="Ask question"
-              >
-                {isAsking ? (
-                  <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
-                ) : (
-                  <Send className="h-4 w-4 sm:mr-2" />
-                )}
-                <span className="hidden sm:inline">{isAsking ? 'Searching…' : 'Ask'}</span>
-              </Button>
-            </div>
-            {inputError && (
-              <p
-                id="company-brain-question-error"
-                role="alert"
-                className="px-2 pt-2 text-sm text-destructive"
-              >
-                {inputError}
-              </p>
-            )}
+      <form
+        onSubmit={handleSubmit}
+        className="sticky bottom-0 z-10 shrink-0 bg-background/95 pb-1 pt-3 backdrop-blur"
+      >
+        <div className="rounded-xl border bg-card p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+          <Label htmlFor="company-brain-question" className="sr-only">
+            Question
+          </Label>
+          <textarea
+            ref={textareaRef}
+            id="company-brain-question"
+            value={question}
+            onChange={(event) => {
+              setQuestion(event.target.value);
+              setInputError(null);
+            }}
+            onKeyDown={handleKeyDown}
+            rows={1}
+            maxLength={MAX_COMPANY_BRAIN_QUESTION_CHARACTERS}
+            placeholder="How do I submit an expense report?"
+            disabled={!isConfigured || isAsking}
+            aria-describedby="company-brain-question-error"
+            className="block min-h-11 max-h-40 w-full resize-none bg-transparent px-2 py-2.5 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+          />
+          <div className="flex items-center justify-between gap-3 px-2 pt-1">
+            <p className="text-xs text-muted-foreground">
+              <span className="hidden sm:inline">Enter to send · Shift + Enter for a new line</span>
+              <span className="sm:hidden">Ask company knowledge</span>
+            </p>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!isConfigured || isAsking || question.trim().length === 0}
+              aria-label="Ask question"
+            >
+              {isAsking ? (
+                <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
+              ) : (
+                <Send className="h-4 w-4 sm:mr-2" />
+              )}
+              <span className="hidden sm:inline">{isAsking ? 'Searching…' : 'Ask'}</span>
+            </Button>
           </div>
-        </form>
-      </CardContent>
-    </Card>
+          {inputError && (
+            <p
+              id="company-brain-question-error"
+              role="alert"
+              className="px-2 pt-2 text-sm text-destructive"
+            >
+              {inputError}
+            </p>
+          )}
+        </div>
+      </form>
+    </section>
   );
 }

@@ -42,7 +42,7 @@ export function ConversationTranscript({ turns, onOpenDirectory }: ConversationT
       role="log"
       aria-label="Company brain conversation"
       aria-relevant="additions text"
-      className="space-y-7 px-4 py-5 sm:px-6 sm:py-6"
+      className="space-y-7 px-1 py-5 sm:px-3 sm:py-6"
     >
       {turns.map((turn) => (
         <li key={turn.id} className="space-y-5">

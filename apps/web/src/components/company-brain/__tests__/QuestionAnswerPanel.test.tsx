@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QuestionAnswerPanel } from '../QuestionAnswerPanel';
 
@@ -7,14 +7,47 @@ jest.mock('../CompanyBrainMarkdown', () => ({
 }));
 
 describe('QuestionAnswerPanel', () => {
-  it('keeps the conversation scrollable while the composer stays pinned in the card', () => {
+  it('keeps the conversation scrollable while the composer stays pinned to the bottom', () => {
     render(<QuestionAnswerPanel isConfigured onAsk={jest.fn()} />);
 
     expect(screen.getByRole('region', { name: 'Conversation history' })).toHaveClass(
       'flex-1',
       'overflow-y-auto',
     );
-    expect(screen.getByLabelText('Question').closest('form')).toHaveClass('shrink-0');
+    expect(screen.getByLabelText('Question').closest('form')).toHaveClass(
+      'sticky',
+      'bottom-0',
+      'shrink-0',
+    );
+    expect(screen.queryByText('Ask the company brain')).not.toBeInTheDocument();
+  });
+
+  it('grows the composer to a maximum height and resets it after sending', async () => {
+    const user = userEvent.setup();
+    const onAsk = jest.fn().mockResolvedValue({
+      status: 'ANSWERED',
+      answer: 'Answer',
+      citations: [],
+    });
+    render(<QuestionAnswerPanel isConfigured onAsk={onAsk} />);
+
+    const input = screen.getByLabelText('Question') as HTMLTextAreaElement;
+    Object.defineProperty(input, 'scrollHeight', {
+      configurable: true,
+      get: () => (input.value ? 240 : 44),
+    });
+
+    fireEvent.change(input, { target: { value: 'First line\nSecond line' } });
+    expect(input.style.height).toBe('160px');
+    expect(input.style.overflowY).toBe('auto');
+
+    await user.click(screen.getByRole('button', { name: 'Ask question' }));
+
+    await waitFor(() => {
+      expect(input).toHaveValue('');
+      expect(input.style.height).toBe('44px');
+      expect(input.style.overflowY).toBe('hidden');
+    });
   });
 
   it('submits a trimmed question and renders its source-backed answer', async () => {
