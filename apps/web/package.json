@@ -2,7 +2,7 @@
   "name": "@app-starter/web",
   "version": "0.0.0",
   "private": true,
-  "description": "App Starter Web - Next.js frontend",
+  "description": "Onboarding Brain web application",
   "scripts": {
     "build": "next build",
     "dev": "dotenv -e .env.local -e .env -- next dev",
