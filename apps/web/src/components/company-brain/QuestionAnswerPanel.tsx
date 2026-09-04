@@ -154,7 +154,20 @@ export function QuestionAnswerPanel({
           />
           <div className="flex items-center justify-between gap-3 px-2 pb-0.5 pt-0.5">
             <p className="text-[11px] leading-4 text-muted-foreground/65 sm:text-xs">
-              <span className="hidden sm:inline">Enter to send · Shift + Enter for a new line</span>
+              <span
+                role="note"
+                aria-label="Enter to send. Shift plus Enter for a new line."
+                className="hidden items-center gap-1 sm:inline-flex [&_kbd]:rounded [&_kbd]:border [&_kbd]:border-border/70 [&_kbd]:bg-muted/40 [&_kbd]:px-1 [&_kbd]:font-sans [&_kbd]:text-[10px] [&_kbd]:font-medium [&_kbd]:leading-4"
+              >
+                <kbd aria-hidden="true">↵</kbd>
+                <span aria-hidden="true">Send</span>
+                <span aria-hidden="true" className="px-0.5">
+                  ·
+                </span>
+                <kbd aria-hidden="true">⇧</kbd>
+                <kbd aria-hidden="true">↵</kbd>
+                <span aria-hidden="true">New line</span>
+              </span>
               <span className="sm:hidden">Ask company knowledge</span>
             </p>
             <Button
