@@ -146,6 +146,18 @@ class EnvironmentVariables {
   @IsOptional()
   COGNEE_DATASET_PREFIX: string = 'organization';
 
+  @IsIn(['embedded', 'cloud'])
+  @IsOptional()
+  COGNEE_PROVIDER: string = 'embedded';
+
+  @IsUrl({ require_tld: false })
+  @IsOptional()
+  COGNEE_CLOUD_API_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  COGNEE_CLOUD_API_KEY?: string;
+
   @IsString()
   @IsOptional()
   OPENAI_TOKEN?: string;
@@ -193,6 +205,18 @@ function validateProductionSecrets(config: EnvironmentVariables): void {
 
 function validateCogneeConfiguration(config: EnvironmentVariables): void {
   if (config.COGNEE_ENABLED !== 'true') {
+    return;
+  }
+
+  if (config.COGNEE_PROVIDER === 'cloud') {
+    const missing = [
+      !config.COGNEE_CLOUD_API_URL?.trim() ? 'COGNEE_CLOUD_API_URL' : null,
+      !config.COGNEE_CLOUD_API_KEY?.trim() ? 'COGNEE_CLOUD_API_KEY' : null,
+    ].filter(Boolean);
+
+    if (missing.length > 0) {
+      throw new Error(`COGNEE_ENABLED=true with cloud provider requires ${missing.join(' and ')}`);
+    }
     return;
   }
 

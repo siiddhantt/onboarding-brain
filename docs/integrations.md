@@ -30,48 +30,52 @@ optional — read the notes below before leaving a value blank.
 
 ## Cognee knowledge layer
 
-The API includes an optional backend boundary around `@cognee/cognee-ts` for
-ingesting text and searching an organization's knowledge graph. It is disabled
-by default, so the starter still boots and all non-AI features work without an
-LLM account.
+Cognee is optional. The company-brain page remains available without it, but
+uploads and questions are disabled.
 
-**Where:** `apps/api/.env`
+### Cognee Cloud
 
 ```bash
 COGNEE_ENABLED=true
+COGNEE_PROVIDER=cloud
+COGNEE_CLOUD_API_URL=https://your-tenant.aws.cognee.ai
+COGNEE_CLOUD_API_KEY=<your API key>
+COGNEE_DATASET_PREFIX=organization
+```
+
+The hosted adapter uses Cognee's `remember` endpoint for ingestion. Questions
+retrieve `CHUNKS` first; only when evidence exists does the adapter request a
+`RAG_COMPLETION`. Retrieved document IDs become citations in the product
+response.
+
+### Embedded TypeScript SDK
+
+```bash
+COGNEE_ENABLED=true
+COGNEE_PROVIDER=embedded
 COGNEE_DATASET_PREFIX=organization
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_TOKEN=<your OpenAI API key>
 ```
 
-The adapter derives the dataset name from the authenticated organization ID
-(`organization-<organization-id>`) and supplies the same ID as Cognee's tenant
-when ingesting. Search callers cannot choose an arbitrary dataset; every query
-is restricted to the requesting organization's dataset.
-
-The SDK is loaded and warmed only on the first Cognee operation. This keeps the
-dependency optional at runtime and avoids paying initialization cost on API
-processes that never use the knowledge layer.
-
-This package is Cognee's **embedded TypeScript SDK**, backed by a native runtime.
-It is not a connector to Cognee Cloud. The product depends on the
-provider-neutral `KnowledgeEngine` interface, so a hosted adapter can replace
-the embedded runtime without changing the company-brain routes or web app. See
+The embedded runtime is loaded only on its first operation. Both providers
+implement the same `KnowledgeEngine` interface, so company-brain routes and
+connectors do not depend on provider response types. See
 [ADR 0010](adr/0010-provider-neutral-knowledge-engine.md).
 
-The company-brain page supports organization-scoped Q&A and document ingestion.
-Owners and admins may upload PDF, DOCX, TXT, Markdown, and HTML files up to 10
-MB; every organization member may ask questions and view the source list.
-Provider failures are recorded as a failed source without exposing internal
-error details.
+For both providers, the API derives the dataset name from the authenticated
+organization ID. Clients cannot supply a dataset. Owners and admins may upload
+documents up to 10 MB; all organization members may ask questions and view
+sources. Provider errors are not exposed to clients.
 
-**Without it:** the page remains visible but clearly disables uploads and Q&A;
-the rest of the application is unaffected.
+Official references: [Cognee Cloud API keys](https://docs.cognee.ai/cognee-cloud/ui/api-keys),
+[data ingestion](https://docs.cognee.ai/cognee-cloud/functionality/data-ingestion),
+and [search](https://docs.cognee.ai/api-reference/search/search).
 
-**Verify the boundary without making an external AI call:**
+**Verify without making an external call:**
 
 ```bash
-pnpm --filter @app-starter/api test -- cognee.service.spec.ts company-brain.service.spec.ts
+pnpm --filter @app-starter/api test -- cognee-cloud.service.spec.ts cognee.service.spec.ts company-brain.service.spec.ts
 ```
 
 ---

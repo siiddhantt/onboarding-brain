@@ -31,6 +31,28 @@ describe('validate', () => {
       expect(() => validate(inputConfig)).not.toThrow();
     });
 
+    it('accepts the cloud provider with its tenant URL and API key', () => {
+      const inputConfig = {
+        ...baseConfig,
+        COGNEE_ENABLED: 'true',
+        COGNEE_PROVIDER: 'cloud',
+        COGNEE_CLOUD_API_URL: 'https://tenant.example.com',
+        COGNEE_CLOUD_API_KEY: 'test-key',
+      };
+
+      expect(() => validate(inputConfig)).not.toThrow();
+    });
+
+    it('refuses to enable the cloud provider without its URL and API key', () => {
+      const inputConfig = {
+        ...baseConfig,
+        COGNEE_ENABLED: 'true',
+        COGNEE_PROVIDER: 'cloud',
+      };
+
+      expect(() => validate(inputConfig)).toThrow(/COGNEE_CLOUD_API_URL.*COGNEE_CLOUD_API_KEY/);
+    });
+
     it('refuses to enable the integration without an OpenAI token', () => {
       const inputConfig = { ...baseConfig, COGNEE_ENABLED: 'true' };
 
