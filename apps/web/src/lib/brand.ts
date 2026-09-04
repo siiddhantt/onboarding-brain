@@ -1,5 +1,2 @@
-/**
- * Brand assets. The logo is served from `public/images/logo.png`;
- * replace that file to rebrand.
- */
-export const LOGO_PATH = '/images/logo.png';
+/** Default product mark. Custom-domain organizations can still provide their own logo. */
+export const LOGO_PATH = '/images/brain-mark.svg';

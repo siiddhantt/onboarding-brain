@@ -1,128 +1,157 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import type { CompanyBrainAnswer } from '@app-starter/shared';
 import {
   MAX_COMPANY_BRAIN_QUESTION_CHARACTERS,
   MIN_COMPANY_BRAIN_QUESTION_CHARACTERS,
 } from '@app-starter/shared';
-import { Loader2, MessageSquareText } from 'lucide-react';
+import { Loader2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  ConversationTranscript,
+  type ConversationResponse,
+  type ConversationTurn,
+} from './ConversationTranscript';
 
 interface QuestionAnswerPanelProps {
   isConfigured: boolean;
   onAsk: (question: string) => Promise<CompanyBrainAnswer>;
+  onOpenDirectory?: () => void;
 }
 
-export function QuestionAnswerPanel({ isConfigured, onAsk }: QuestionAnswerPanelProps) {
+export function QuestionAnswerPanel({
+  isConfigured,
+  onAsk,
+  onOpenDirectory,
+}: QuestionAnswerPanelProps) {
   const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState<CompanyBrainAnswer | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [turns, setTurns] = useState<ConversationTurn[]>([]);
+  const [inputError, setInputError] = useState<string | null>(null);
   const [isAsking, setIsAsking] = useState(false);
+  const nextTurnId = useRef(1);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedQuestion = question.trim();
 
     if (trimmedQuestion.length < MIN_COMPANY_BRAIN_QUESTION_CHARACTERS) {
-      setError(
+      setInputError(
         `Enter a question with at least ${MIN_COMPANY_BRAIN_QUESTION_CHARACTERS} characters.`,
       );
       return;
     }
 
-    setError(null);
+    const turnId = `turn-${nextTurnId.current++}`;
+    setInputError(null);
     setIsAsking(true);
+    setQuestion('');
+    setTurns((currentTurns) => [
+      ...currentTurns,
+      { id: turnId, question: trimmedQuestion, response: { status: 'PENDING' } },
+    ]);
 
     try {
-      setAnswer(await onAsk(trimmedQuestion));
+      const result = await onAsk(trimmedQuestion);
+      const response: ConversationResponse =
+        result.status === 'ANSWERED' && result.answer
+          ? { status: 'ANSWERED', answer: result.answer, citations: result.citations }
+          : { status: 'NO_ANSWER', citations: result.citations };
+
+      setTurns((currentTurns) =>
+        currentTurns.map((turn) => (turn.id === turnId ? { ...turn, response } : turn)),
+      );
     } catch (askError) {
-      setAnswer(null);
-      setError(
+      const message =
         askError && typeof askError === 'object' && 'message' in askError
           ? String(askError.message)
-          : 'Could not ask the company brain.',
+          : 'Try again in a moment.';
+      setTurns((currentTurns) =>
+        currentTurns.map((turn) =>
+          turn.id === turnId ? { ...turn, response: { status: 'ERROR', message } } : turn,
+        ),
       );
     } finally {
       setIsAsking(false);
+      textareaRef.current?.focus();
+    }
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
     }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Ask the company brain</CardTitle>
+    <Card className="overflow-hidden">
+      <CardHeader className="border-b bg-muted/20">
+        <CardTitle className="text-lg">Ask the company brain</CardTitle>
         <CardDescription>
           Answers are grounded in this organization&apos;s indexed knowledge.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="space-y-2">
-            <Label htmlFor="company-brain-question">Question</Label>
+      <CardContent className="p-0">
+        <ConversationTranscript turns={turns} onOpenDirectory={onOpenDirectory} />
+
+        <form onSubmit={handleSubmit} className="border-t bg-card p-4 sm:p-5">
+          <div className="rounded-xl border bg-background p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+            <Label htmlFor="company-brain-question" className="sr-only">
+              Question
+            </Label>
             <Textarea
+              ref={textareaRef}
               id="company-brain-question"
               value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-              rows={4}
+              onChange={(event) => {
+                setQuestion(event.target.value);
+                setInputError(null);
+              }}
+              onKeyDown={handleKeyDown}
+              rows={2}
               maxLength={MAX_COMPANY_BRAIN_QUESTION_CHARACTERS}
               placeholder="How do I submit an expense report?"
               disabled={!isConfigured || isAsking}
               aria-describedby="company-brain-question-error"
+              className="min-h-[4.5rem] resize-none border-0 bg-transparent p-2 shadow-none focus-visible:ring-0"
             />
-            {error && (
+            <div className="flex items-center justify-between gap-3 px-2 pt-2">
+              <p className="text-xs text-muted-foreground">
+                <span className="hidden sm:inline">
+                  Enter to send · Shift + Enter for a new line
+                </span>
+                <span className="sm:hidden">Ask company knowledge</span>
+              </p>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={!isConfigured || isAsking || question.trim().length === 0}
+                aria-label="Ask question"
+              >
+                {isAsking ? (
+                  <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
+                ) : (
+                  <Send className="h-4 w-4 sm:mr-2" />
+                )}
+                <span className="hidden sm:inline">{isAsking ? 'Searching…' : 'Ask'}</span>
+              </Button>
+            </div>
+            {inputError && (
               <p
                 id="company-brain-question-error"
                 role="alert"
-                className="text-sm text-destructive"
+                className="px-2 pt-2 text-sm text-destructive"
               >
-                {error}
+                {inputError}
               </p>
             )}
           </div>
-          <Button type="submit" disabled={!isConfigured || isAsking}>
-            {isAsking ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <MessageSquareText className="mr-2 h-4 w-4" />
-            )}
-            {isAsking ? 'Searching…' : 'Ask question'}
-          </Button>
         </form>
-
-        {answer && (
-          <div className="space-y-4 border-t pt-4" aria-live="polite">
-            {answer.status === 'ANSWERED' && answer.answer ? (
-              <p className="whitespace-pre-wrap text-sm leading-6">{answer.answer}</p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                I could not find an answer in the indexed knowledge. No answer was generated.
-              </p>
-            )}
-
-            {answer.citations.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium">Sources</h3>
-                <ol className="space-y-2">
-                  {answer.citations.map((citation, index) => (
-                    <li
-                      key={`${citation.sourceId ?? citation.sourceName}-${index}`}
-                      className="rounded-md bg-muted p-3 text-sm"
-                    >
-                      <p className="font-medium">{citation.sourceName}</p>
-                      {citation.excerpt && (
-                        <p className="mt-1 text-muted-foreground">{citation.excerpt}</p>
-                      )}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            )}
-          </div>
-        )}
       </CardContent>
     </Card>
   );

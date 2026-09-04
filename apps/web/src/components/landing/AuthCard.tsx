@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton';
 import { SignUpForm } from './SignUpForm';
@@ -29,8 +29,6 @@ export function AuthCard({ initialMode = 'login' }: AuthCardProps) {
     }
   }, [tab]);
 
-  const intentParam = searchParams.get('intent');
-
   const handleSwitchToLogin = () => {
     setMode('login');
     // Update URL to preserve redirect and email parameters
@@ -41,9 +39,6 @@ export function AuthCard({ initialMode = 'login' }: AuthCardProps) {
     }
     if (emailParam) {
       params.set('email', emailParam);
-    }
-    if (intentParam) {
-      params.set('intent', intentParam);
     }
     router.push(`/login?${params.toString()}`);
   };
@@ -59,26 +54,22 @@ export function AuthCard({ initialMode = 'login' }: AuthCardProps) {
     if (emailParam) {
       params.set('email', emailParam);
     }
-    if (intentParam) {
-      params.set('intent', intentParam);
-    }
     router.push(`/login?${params.toString()}`);
   };
 
-  // Calculate effective return URL for Google Auth
-  let googleReturnUrl = redirectParam || undefined;
-  if (!googleReturnUrl && intentParam === 'presentation') {
-    googleReturnUrl = '/create-topic?from=login';
-  } else if (!googleReturnUrl && intentParam === 'calendar') {
-    googleReturnUrl = '/organizations/create';
-  } else if (!googleReturnUrl && intentParam === 'collaboration') {
-    googleReturnUrl = '/events/create';
-  }
+  const googleReturnUrl = redirectParam || undefined;
 
   return (
-    <Card className="max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle>{mode === 'signup' ? 'Create Account' : 'Sign In'}</CardTitle>
+    <Card className="mx-auto w-full max-w-md shadow-md">
+      <CardHeader className="pb-4">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {mode === 'signup' ? 'Create your account' : 'Sign in'}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {mode === 'signup'
+            ? 'Set up your workspace and invite your team.'
+            : 'Continue to your organization’s company brain.'}
+        </p>
       </CardHeader>
       <CardContent>
         {mode === 'signup' ? (
@@ -90,7 +81,7 @@ export function AuthCard({ initialMode = 'login' }: AuthCardProps) {
                   <Separator className="w-full" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                  <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
                 </div>
               </div>
             </div>
@@ -105,7 +96,7 @@ export function AuthCard({ initialMode = 'login' }: AuthCardProps) {
                   <Separator className="w-full" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                  <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
                 </div>
               </div>
             </div>

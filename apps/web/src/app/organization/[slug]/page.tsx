@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   return {
     title: organization.name,
-    description: organization.description ?? `${organization.name} on App Starter`,
+    description: organization.description ?? `${organization.name} on Onboarding Brain`,
   };
 }
 

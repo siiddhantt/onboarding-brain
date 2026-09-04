@@ -48,18 +48,15 @@ const SubNav = ({
   const Link = LinkComponent ?? DefaultLink;
 
   return (
-    <header
-      className={`border-b border-[var(--color-mist)] bg-[var(--color-dew)] px-4 py-3 ${className}`.trim()}
-      {...rest}
-    >
+    <header className={`border-b border-border bg-card px-4 py-3 ${className}`.trim()} {...rest}>
       <nav className="flex items-center gap-1" aria-label={ariaLabel}>
         {items.map((item) => {
           const active = isActive(item.path, item.exact);
           const linkClassName = [
             'inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors',
             active
-              ? 'bg-[var(--color-mist)] text-[var(--color-soil)]'
-              : 'text-[var(--color-leaf)] hover:bg-[var(--color-mist)] hover:text-[var(--color-soil)]',
+              ? 'bg-muted text-foreground'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground',
           ].join(' ');
           return (
             <Link key={item.path} to={item.path} className={linkClassName} active={active}>

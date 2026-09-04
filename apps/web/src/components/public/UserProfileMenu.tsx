@@ -1,7 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,9 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { logout } from '@/lib/auth-utils';
-import { authStorage, AUTH_CHANGE_EVENT } from '@/lib/auth-storage';
-import { authApi } from '@/lib/auth-api';
-import { User, LogOut, Settings, UserCog, Calendar } from 'lucide-react';
+import { User, LogOut, Settings, UserCog } from 'lucide-react';
 import { navigateToApp } from '@/lib/utils';
 
 import { useAuth } from '@/hooks/use-auth';
@@ -83,12 +79,6 @@ export function UserProfileMenu() {
           <UserCog className="mr-2 h-4 w-4" />
           Edit Profile
         </DropdownMenuItem>
-        {(user.defaultCalendarId || user.defaultCalendarSlug) && (
-          <DropdownMenuItem onClick={() => navigateToApp('/my-calendar/edit', router)}>
-            <Calendar className="mr-2 h-4 w-4" />
-            Edit My Calendar
-          </DropdownMenuItem>
-        )}
         <DropdownMenuItem onClick={() => navigateToApp('/settings/notifications', router)}>
           <Settings className="mr-2 h-4 w-4" />
           Settings

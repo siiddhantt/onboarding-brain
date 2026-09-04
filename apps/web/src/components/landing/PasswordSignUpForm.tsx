@@ -52,7 +52,6 @@ export function PasswordSignUpForm() {
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get('redirect');
   const emailParam = searchParams.get('email');
-  const intentParam = searchParams.get('intent');
 
   // Prefer email from URL (e.g., from invitation), then saved email
   const initialEmail = emailParam || authStorage.getLastEmail() || '';
@@ -85,7 +84,6 @@ export function PasswordSignUpForm() {
         password: data.password,
         name: data.name,
         redirectUrl: redirectParam || undefined,
-        intent: intentParam || undefined,
       });
       authStorage.setTokens(response.accessToken, response.refreshToken);
       authStorage.setUser({
@@ -94,27 +92,7 @@ export function PasswordSignUpForm() {
         name: response.user.name,
       });
       toast.success('Account created! Please check your email to verify your account.');
-      // Redirect to a page that shows email verification message
-      let redirectPath = '/verify-email-pending';
-
-      if (redirectParam) {
-        // If there's an explicit redirect, we might want to go there?
-        // But usually verifying email is key. However, if user is logged in, we can redirect.
-        // The original code redirected to /verify-email-pending even if redirectParam existed.
-        // Let's assume verifying is important usually.
-        // But for "presentation" intent, we want direct access.
-        redirectPath = '/verify-email-pending';
-      }
-
-      if (intentParam === 'presentation') {
-        redirectPath = '/create-topic?from=login';
-      } else if (intentParam === 'calendar') {
-        redirectPath = '/organizations/create';
-      } else if (intentParam === 'collaboration') {
-        redirectPath = '/events/create';
-      }
-
-      router.push(redirectPath);
+      router.push('/verify-email-pending');
     } catch (error: unknown) {
       const apiError = error as { message?: string; statusCode?: number };
       if (apiError.statusCode === 409) {

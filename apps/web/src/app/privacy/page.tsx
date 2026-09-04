@@ -7,8 +7,8 @@ export default function PrivacyPage() {
       <PageHeader title="Privacy Policy" description="Last updated: May 4, 2026" />
       <div className="prose prose-sm max-w-none dark:prose-invert">
         <p>
-          At App Starter, we take your privacy seriously. This policy explains how we collect, use,
-          and protect your personal data.
+          At Onboarding Brain, we take your privacy seriously. This policy explains how we collect,
+          use, and protect your personal data.
         </p>
         <h2>Data We Collect</h2>
         <p>

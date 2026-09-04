@@ -20,7 +20,7 @@ export function AppSideNav() {
 
   return (
     <aside
-      className="hidden md:flex flex-col w-16 flex-shrink-0 border-r border-[var(--color-mist)] bg-[var(--color-dew)] fixed left-0 top-16 h-[calc(100vh-4rem)] z-40"
+      className="fixed left-0 top-16 z-40 hidden h-[calc(100vh-4rem)] w-16 flex-shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex"
       aria-label="Main navigation"
     >
       <SidebarNav

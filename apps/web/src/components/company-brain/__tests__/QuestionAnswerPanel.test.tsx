@@ -2,6 +2,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QuestionAnswerPanel } from '../QuestionAnswerPanel';
 
+jest.mock('../CompanyBrainMarkdown', () => ({
+  CompanyBrainMarkdown: ({ content }: { content: string }) => <div>{content}</div>,
+}));
+
 describe('QuestionAnswerPanel', () => {
   it('submits a trimmed question and renders its source-backed answer', async () => {
     const user = userEvent.setup();
@@ -43,8 +47,29 @@ describe('QuestionAnswerPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Ask question' }));
 
     expect(
-      await screen.findByText(/could not find an answer.*No answer was generated/i),
+      await screen.findByText(/could not find enough supported information/i),
     ).toBeInTheDocument();
+  });
+
+  it('keeps earlier questions and answers in the conversation', async () => {
+    const user = userEvent.setup();
+    const onAsk = jest
+      .fn()
+      .mockResolvedValueOnce({ status: 'ANSWERED', answer: 'First answer', citations: [] })
+      .mockResolvedValueOnce({ status: 'ANSWERED', answer: 'Second answer', citations: [] });
+    render(<QuestionAnswerPanel isConfigured onAsk={onAsk} />);
+
+    const input = screen.getByLabelText('Question');
+    await user.type(input, 'First question');
+    await user.click(screen.getByRole('button', { name: 'Ask question' }));
+    expect(await screen.findByText('First answer')).toBeInTheDocument();
+
+    await user.type(input, 'Second question');
+    await user.click(screen.getByRole('button', { name: 'Ask question' }));
+
+    expect(await screen.findByText('Second answer')).toBeInTheDocument();
+    expect(screen.getByText('First question')).toBeInTheDocument();
+    expect(screen.getByText('First answer')).toBeInTheDocument();
   });
 
   it('disables questions while the knowledge engine is not configured', () => {

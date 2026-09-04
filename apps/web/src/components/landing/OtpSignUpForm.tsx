@@ -43,7 +43,6 @@ export function OtpSignUpForm() {
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get('redirect');
   const emailParam = searchParams.get('email');
-  const intentParam = searchParams.get('intent');
 
   // Prefer email from URL (e.g., from invitation), then saved email
   const initialEmail = emailParam || authStorage.getLastEmail() || '';
@@ -128,7 +127,6 @@ export function OtpSignUpForm() {
         email: data.email,
         otp: data.otp,
         name: data.name,
-        intent: intentParam || undefined,
       });
       authStorage.setTokens(response.accessToken, response.refreshToken);
       authStorage.setUser({
@@ -137,21 +135,7 @@ export function OtpSignUpForm() {
         name: response.user.name,
       });
       toast.success('Account created successfully!');
-      let redirectPath;
-
-      if (redirectParam) {
-        redirectPath = await redirectAfterAuth(redirectParam);
-      } else if (intentParam === 'presentation') {
-        redirectPath = '/create-topic?from=login';
-      } else if (intentParam === 'calendar') {
-        redirectPath = '/organizations/create';
-      } else if (intentParam === 'collaboration') {
-        redirectPath = '/events/create';
-      } else {
-        redirectPath = await redirectAfterAuth(null);
-      }
-
-      router.push(redirectPath);
+      router.push(await redirectAfterAuth(redirectParam));
     } catch (error: unknown) {
       const apiError = error as { message?: string; statusCode?: number };
       if (apiError.statusCode === 400) {
@@ -234,37 +218,9 @@ export function OtpSignUpForm() {
     );
   }
 
-  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    console.log('Form submit event triggered');
-    console.log('Form values:', otpForm.getValues());
-    console.log('Form errors:', otpForm.formState.errors);
-    console.log('Form is valid:', otpForm.formState.isValid);
-    console.log('Form is dirty:', otpForm.formState.isDirty);
-
-    otpForm.handleSubmit(
-      (data) => {
-        console.log('Form validation passed, submitting with data:', data);
-        onOtpSubmit(data);
-      },
-      (errors) => {
-        console.log('Form validation failed with errors:', errors);
-        console.log('Current form values:', otpForm.getValues());
-      },
-    )(e);
-  };
-
-  const handleButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    console.log('Button clicked');
-    console.log('Button disabled:', isLoading);
-    console.log('Form values:', otpForm.getValues());
-    console.log('Form errors:', otpForm.formState.errors);
-    // Don't prevent default - let the form submit naturally
-  };
-
   return (
     <Form {...otpForm}>
-      <form onSubmit={handleFormSubmit} className="space-y-4">
+      <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-4">
         {email ? (
           <>
             <div className="text-sm text-muted-foreground mb-4">
@@ -318,10 +274,7 @@ export function OtpSignUpForm() {
                   <InputOTP
                     maxLength={6}
                     value={field.value ?? ''}
-                    onChange={(value) => {
-                      console.log('OTP onChange - value:', value);
-                      field.onChange(value ?? '');
-                    }}
+                    onChange={(value) => field.onChange(value ?? '')}
                     onBlur={field.onBlur}
                     disabled={field.disabled}
                     name={field.name}
@@ -361,7 +314,7 @@ export function OtpSignUpForm() {
             {otpForm.formState.errors.email.message}
           </p>
         )}
-        <Button type="submit" className="w-full" disabled={isLoading} onClick={handleButtonClick}>
+        <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? 'Verifying...' : 'Verify & Sign Up'}
         </Button>
 

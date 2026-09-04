@@ -22,7 +22,7 @@ export function DomainMappingForm({ organizationId, onSuccess }: DomainMappingFo
     // Basic validation
     const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
     if (!domainRegex.test(domain)) {
-      toast.error('Invalid domain format. Hostname only, e.g., events.company.com');
+      toast.error('Invalid domain format. Hostname only, e.g., onboarding.company.com');
       return;
     }
 
@@ -46,14 +46,14 @@ export function DomainMappingForm({ organizationId, onSuccess }: DomainMappingFo
         <div className="flex-grow">
           <Input
             type="text"
-            placeholder="e.g. events.company.com"
+            placeholder="e.g. onboarding.company.com"
             value={domain}
             onChange={(e) => setDomain(e.target.value)}
             disabled={isSubmitting}
             className="w-full"
           />
-          <p className="mt-2 text-xs text-slate-500">
-            Enter the subdomain and domain you want to use for your calendar.
+          <p className="mt-2 text-xs text-muted-foreground">
+            Enter the domain you want to use for this organization.
           </p>
         </div>
         <Button type="submit" disabled={isSubmitting || !domain} className="h-10">

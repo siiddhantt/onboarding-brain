@@ -67,9 +67,9 @@ export function OrganizationEmailSettingsSection({
       <div className="flex items-start gap-3">
         <Mail className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" aria-hidden />
         <div className="space-y-1">
-          <h2 className="text-lg font-semibold tracking-tight">Email Branding</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Email branding</h2>
           <p className="text-sm text-muted-foreground">
-            Customize how speaker communication emails appear to recipients.
+            Customize how organization emails appear to recipients.
           </p>
         </div>
       </div>
@@ -85,11 +85,11 @@ export function OrganizationEmailSettingsSection({
               id="email-sender-name"
               value={emailSenderName}
               onChange={(e) => setEmailSenderName(e.target.value)}
-              placeholder="e.g. App Starter Team"
+              placeholder="e.g. Acme People Team"
               maxLength={100}
             />
             <p className="text-xs text-muted-foreground">
-              The name that will appear in the "From" field. Defaults to "App Starter".
+              The name that will appear in the "From" field. Defaults to "Onboarding Brain".
             </p>
           </div>
 
@@ -106,7 +106,7 @@ export function OrganizationEmailSettingsSection({
               placeholder="e.g. contact@yourorganization.com"
             />
             <p className="text-xs text-muted-foreground">
-              The email address where speaker replies will be sent.
+              The email address where replies will be sent.
             </p>
           </div>
         </div>

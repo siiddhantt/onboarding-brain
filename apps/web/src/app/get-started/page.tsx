@@ -6,16 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { PageHeader } from '@/components/layout/PageHeader';
 
 export const metadata: Metadata = {
-  title: 'Get started · App Starter',
+  title: 'Get started · Onboarding Brain',
   description: 'Create an account, set up an organization, and invite your team.',
 };
 
 /**
  * Public onboarding page for visitors who have not signed up yet.
  *
- * Boilerplate on purpose: it is the first screen worth rewriting for a real
- * product, so it says what the starter actually does rather than standing in
- * for a marketing page that does not exist yet.
+ * A short path from account creation to an organization with searchable knowledge.
  */
 const STEPS = [
   {
@@ -47,7 +45,7 @@ const GetStartedPage = () => (
           Get started
         </>
       }
-      description="Three steps from a fresh account to a working workspace."
+      description="Three steps from a fresh account to a searchable onboarding workspace."
     />
 
     <ol className="grid gap-4 sm:grid-cols-3">
@@ -75,8 +73,7 @@ const GetStartedPage = () => (
       <CardHeader>
         <CardTitle>Ready when you are</CardTitle>
         <CardDescription>
-          Creating an account takes a moment and nothing is charged — billing is not part of this
-          starter.
+          Create an account, set up your organization, and start adding onboarding knowledge.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 sm:flex-row">

@@ -39,24 +39,23 @@ export const CookieConsentBanner = () => {
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background border-t shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex-1 space-y-1">
-            <h3 className="text-lg font-semibold">We use cookies to improve your experience</h3>
-            <p className="text-sm text-muted-foreground">
-              We use essential cookies for authentication and security, and optional analytics
-              cookies to understand how you use our platform and improve our services. Learn more in
-              our{' '}
-              <Link href="/privacy" className="underline hover:text-foreground transition-colors">
-                Privacy Policy
-              </Link>{' '}
-              and{' '}
-              <Link href="/cookies" className="underline hover:text-foreground transition-colors">
-                Cookie Policy
-              </Link>
-              .
-            </p>
-          </div>
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background p-3 shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-3 md:flex-row md:items-center">
+          <p className="flex-1 text-sm leading-5 text-muted-foreground">
+            <span className="font-semibold text-foreground">
+              We use cookies to improve your experience.
+            </span>{' '}
+            Essential cookies keep sign-in secure; optional analytics help us improve the product.
+            Learn more in our{' '}
+            <Link href="/privacy" className="underline hover:text-foreground transition-colors">
+              Privacy Policy
+            </Link>{' '}
+            and{' '}
+            <Link href="/cookies" className="underline hover:text-foreground transition-colors">
+              Cookie Policy
+            </Link>
+            .
+          </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="ghost" size="sm" onClick={handleRejectAll}>
               Reject All

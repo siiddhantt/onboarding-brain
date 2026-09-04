@@ -9,17 +9,17 @@
 @layer base {
   :root {
     /* RGB triplets from DS light theme for opacity-aware utilities */
-    --background-rgb: 249 250 251; /* dew */
+    --background-rgb: 248 250 252;
     --foreground-rgb: 15 23 42; /* soil */
     --primary-rgb: 15 23 42; /* soil */
     --primary-foreground-rgb: 249 250 251;
     --muted-rgb: 229 231 235; /* mist */
     --muted-foreground-rgb: 75 85 99; /* stem */
     --border-rgb: 229 231 235;
-    --card-rgb: 249 250 251;
+    --card-rgb: 255 255 255;
     --accent-rgb: 229 231 235;
     --accent-foreground-rgb: 15 23 42;
-    --sidebar-rgb: 249 250 251;
+    --sidebar-rgb: 255 255 255;
     --sidebar-foreground-rgb: 75 85 99;
     --sidebar-border-rgb: 229 231 235;
     /* Destructive (from tokens.css --color-destructive) */
@@ -27,19 +27,19 @@
   }
 
   .dark {
-    --background-rgb: 31 41 55; /* dew (dark) */
+    --background-rgb: 11 18 32;
     --foreground-rgb: 243 244 246; /* soil (dark) */
     --primary-rgb: 243 244 246;
     --primary-foreground-rgb: 15 23 42;
-    --muted-rgb: 55 65 81; /* mist (dark) */
-    --muted-foreground-rgb: 156 163 175;
-    --border-rgb: 55 65 81;
-    --card-rgb: 31 41 55;
-    --accent-rgb: 55 65 81;
+    --muted-rgb: 30 41 59;
+    --muted-foreground-rgb: 148 163 184;
+    --border-rgb: 38 50 68;
+    --card-rgb: 17 24 39;
+    --accent-rgb: 30 41 59;
     --accent-foreground-rgb: 243 244 246;
-    --sidebar-rgb: 15 23 42;
+    --sidebar-rgb: 17 24 39;
     --sidebar-foreground-rgb: 243 244 246;
-    --sidebar-border-rgb: 55 65 81;
+    --sidebar-border-rgb: 38 50 68;
     /* Destructive dark (from tokens.css .dark --color-destructive) */
     --destructive-rgb: 248 113 113;
   }
@@ -51,7 +51,7 @@
 
 @layer base {
   * {
-    border-color: var(--color-mist);
+    border-color: rgb(var(--border-rgb));
   }
 
   html,
@@ -62,8 +62,8 @@
   }
 
   body {
-    background-color: var(--color-dew);
-    color: var(--color-soil);
+    background-color: rgb(var(--background-rgb));
+    color: rgb(var(--foreground-rgb));
   }
 
   /* Typography – DS text scale */

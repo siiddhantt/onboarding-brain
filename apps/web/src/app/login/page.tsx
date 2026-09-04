@@ -16,18 +16,10 @@ export default function LoginPage() {
   useEffect(() => {
     // Check if user is authenticated
     if (authStorage.isAuthenticated()) {
-      // Redirect based on params if logged in
-      const intent = searchParams.get('intent');
       const redirect = searchParams.get('redirect');
 
       if (redirect) {
         router.push(redirect);
-      } else if (intent === 'presentation') {
-        router.push('/create-topic?from=login');
-      } else if (intent === 'calendar') {
-        router.push('/organizations/create');
-      } else if (intent === 'collaboration') {
-        router.push('/events/create');
       } else {
         router.push('/dashboard');
       }
@@ -48,9 +40,11 @@ export default function LoginPage() {
 
   // Only show login/signup if not authenticated
   return (
-    <main className="min-h-screen bg-gradient-subtle">
-      <LandingHero />
-      <div className="container mx-auto px-4 pb-16">
+    <main className="min-h-[calc(100svh-4rem)] bg-background px-4 py-6 pb-36 sm:px-6 sm:py-8 lg:grid lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-center lg:gap-16 lg:px-12 xl:px-20">
+      <div className="hidden lg:block">
+        <LandingHero />
+      </div>
+      <div className="mx-auto w-full max-w-md lg:mx-0">
         <AuthCard initialMode={initialMode} />
       </div>
     </main>

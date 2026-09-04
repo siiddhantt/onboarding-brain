@@ -23,11 +23,11 @@ export async function generateMetadata(): Promise<Metadata> {
     title: 'Onboarding Brain',
     description: 'Source-backed answers from the onboarding knowledge your organization provides.',
     icons: {
-      icon: '/images/favicon.png',
+      icon: '/images/brain-mark.svg',
     },
   };
 
-  // Only attempt resolution if not on the main App Starter domain or localhost
+  // Only attempt resolution if not on the primary domain or localhost
   const isMainDomain = host.includes('example.com') || host.includes('localhost');
   if (!isMainDomain && host) {
     try {
@@ -73,7 +73,7 @@ export default async function RootLayout({
   let customLogoUrl: string | null = null;
   let logoHeight: number | null = null;
 
-  // Only attempt resolution if not on the main App Starter domain or localhost
+  // Only attempt resolution if not on the primary domain or localhost
   const isMainDomain = host.includes('example.com') || host.includes('localhost');
   if (!isMainDomain && host) {
     try {

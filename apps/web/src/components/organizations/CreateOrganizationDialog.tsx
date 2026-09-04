@@ -25,9 +25,9 @@ export function CreateOrganizationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create a Organization</DialogTitle>
+          <DialogTitle>Create an organization</DialogTitle>
           <DialogDescription>
-            Create a new organization to collaborate and organize events together.
+            Create a workspace for your team and its onboarding knowledge.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">

@@ -47,7 +47,7 @@ export function UnifiedHeader({
             as={Link}
             href="/"
             logoSrc={customLogoUrl || LOGO_PATH}
-            logoAlt="Onboarding Brain"
+            logoAlt={customLogoUrl ? 'Onboarding Brain' : ''}
             brandName={customLogoUrl ? '' : 'Onboarding Brain'}
             logoHeight={logoHeight}
             isCustomLogo={!!customLogoUrl}

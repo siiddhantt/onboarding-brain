@@ -11,10 +11,10 @@ export default async function DomainErrorPage({
   const reason = resolvedSearchParams.reason;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md w-full text-center">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md text-center">
         <div className="mb-6">
-          <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-red-100 text-red-600 mb-4">
+          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive">
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
@@ -24,31 +24,31 @@ export default async function DomainErrorPage({
               />
             </svg>
           </div>
-          <h1 className="text-3xl font-extrabold text-gray-900 mb-2">Domain Not Active</h1>
-          <p className="text-gray-600">
+          <h1 className="mb-2 text-3xl font-bold text-foreground">Domain not active</h1>
+          <p className="text-muted-foreground">
             {reason === 'not_found'
-              ? `The domain "${domain}" is not currently associated with any organization on App Starter.`
+              ? `The domain "${domain}" is not currently associated with an organization.`
               : `We couldn't verify the configuration for "${domain}".`}
           </p>
         </div>
 
         <div className="space-y-4">
-          <p className="text-sm text-gray-500">
-            If you are the administrator of this domain, please check your App Starter dashboard
-            settings and DNS configuration.
+          <p className="text-sm text-muted-foreground">
+            If you administer this domain, check the organization&apos;s domain settings and DNS
+            configuration.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href={process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}
-              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
             >
-              Go to App Starter Dashboard
+              Go to Onboarding Brain
             </Link>
             <Link
               href="mailto:support@example.com"
-              className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              className="inline-flex items-center justify-center rounded-md border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
             >
-              Contact Support
+              Contact support
             </Link>
           </div>
         </div>

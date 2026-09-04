@@ -53,7 +53,6 @@ export function LoginForm({ onSwitchToSignup }: LoginFormProps) {
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get('redirect');
   const emailParam = searchParams.get('email');
-  const intentParam = searchParams.get('intent');
 
   // Prefer email from URL (e.g., from invitation), then saved email
   const savedEmail = emailParam || authStorage.getLastEmail() || '';
@@ -104,22 +103,7 @@ export function LoginForm({ onSwitchToSignup }: LoginFormProps) {
         name: response.user.name,
       });
       toast.success('Login successful!');
-      toast.success('Login successful!');
-      let redirectPath;
-
-      if (redirectParam) {
-        redirectPath = await redirectAfterAuth(redirectParam);
-      } else if (intentParam === 'presentation') {
-        redirectPath = '/create-topic?from=login';
-      } else if (intentParam === 'calendar') {
-        redirectPath = '/organizations/create';
-      } else if (intentParam === 'collaboration') {
-        redirectPath = '/events/create';
-      } else {
-        redirectPath = await redirectAfterAuth(null);
-      }
-
-      router.push(redirectPath);
+      router.push(await redirectAfterAuth(redirectParam));
     } catch (error: unknown) {
       const apiError = error as { message?: string; statusCode?: number };
       const errorMessage = apiError.message || 'Login failed. Please try again.';
@@ -173,22 +157,7 @@ export function LoginForm({ onSwitchToSignup }: LoginFormProps) {
         name: response.user.name,
       });
       toast.success('Login successful!');
-      toast.success('Login successful!');
-      let redirectPath;
-
-      if (redirectParam) {
-        redirectPath = await redirectAfterAuth(redirectParam);
-      } else if (intentParam === 'presentation') {
-        redirectPath = '/create-topic?from=login';
-      } else if (intentParam === 'calendar') {
-        redirectPath = '/organizations/create';
-      } else if (intentParam === 'collaboration') {
-        redirectPath = '/events/create';
-      } else {
-        redirectPath = await redirectAfterAuth(null);
-      }
-
-      router.push(redirectPath);
+      router.push(await redirectAfterAuth(redirectParam));
     } catch (error: unknown) {
       const apiError = error as { message?: string; statusCode?: number };
       if (apiError.statusCode === 400) {

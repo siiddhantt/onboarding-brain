@@ -87,8 +87,8 @@ export function OrganizationDangerZoneSection({
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the organization
-              <strong> &quot;{organizationName}&quot;</strong> along with all of its calendars,
-              events, sessions, members, and invites.
+              <strong> &quot;{organizationName}&quot;</strong> along with its knowledge sources,
+              departments, members, invites, and settings.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -28,6 +28,11 @@ const formatBytes = (bytes: number | null): string => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const formatDate = (value: string): string =>
+  new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(
+    new Date(value),
+  );
+
 interface KnowledgeSourcesPanelProps {
   sources: KnowledgeSource[];
   canManage: boolean;
@@ -45,6 +50,7 @@ export function KnowledgeSourcesPanel({
 }: KnowledgeSourcesPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -64,6 +70,7 @@ export function KnowledgeSourcesPanel({
     try {
       await onUpload(file);
       event.currentTarget.reset();
+      setSelectedFileName(null);
     } catch (uploadError) {
       setError(
         uploadError && typeof uploadError === 'object' && 'message' in uploadError
@@ -74,28 +81,57 @@ export function KnowledgeSourcesPanel({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Knowledge sources</CardTitle>
-        <CardDescription>
-          Add the policies and guides employees should be able to search.
-        </CardDescription>
+    <Card className="overflow-hidden">
+      <CardHeader className="border-b bg-muted/20 sm:flex-row sm:items-start sm:justify-between sm:space-y-0">
+        <div className="space-y-1.5">
+          <CardTitle className="text-lg">Knowledge sources</CardTitle>
+          <CardDescription>Manage the policies and guides employees can search.</CardDescription>
+        </div>
+        <Badge variant="outline" className="w-fit">
+          {sources.length} {sources.length === 1 ? 'source' : 'sources'}
+        </Badge>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="p-0">
         {canManage ? (
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="knowledge-document">Onboarding document</Label>
+          <section className="border-b p-5 sm:p-6" aria-labelledby="add-knowledge-source">
+            <div className="mb-4">
+              <h2 id="add-knowledge-source" className="text-sm font-semibold">
+                Add a document
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                It stays isolated to this organization when it is indexed.
+              </p>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <Label
+                htmlFor="knowledge-document"
+                className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed bg-muted/20 px-4 py-5 text-center transition-colors hover:bg-muted/40"
+              >
+                <span className="sr-only">Onboarding document</span>
+                <Upload className="mb-2 h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                <span className="text-sm font-medium">
+                  {selectedFileName ?? 'Choose an onboarding document'}
+                </span>
+                <span className="mt-1 text-xs font-normal text-muted-foreground">
+                  PDF, DOCX, TXT, Markdown, or HTML · up to 10 MB
+                </span>
+              </Label>
               <Input
                 ref={inputRef}
                 id="knowledge-document"
                 name="file"
                 type="file"
+                aria-label="Onboarding document"
                 accept={KNOWLEDGE_DOCUMENT_MIME_TYPES.join(',')}
                 disabled={!isConfigured || isUploading}
                 aria-describedby="knowledge-document-help knowledge-document-error"
+                className="sr-only"
+                onChange={(event) => {
+                  setSelectedFileName(event.target.files?.[0]?.name ?? null);
+                  setError(null);
+                }}
               />
-              <p id="knowledge-document-help" className="text-xs text-muted-foreground">
+              <p id="knowledge-document-help" className="sr-only">
                 PDF, DOCX, TXT, Markdown, or HTML. Maximum 10 MB.
               </p>
               {error && (
@@ -103,56 +139,75 @@ export function KnowledgeSourcesPanel({
                   {error}
                 </p>
               )}
-            </div>
-            <Button type="submit" size="sm" disabled={!isConfigured || isUploading}>
-              {isUploading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="mr-2 h-4 w-4" />
-              )}
-              {isUploading ? 'Indexing…' : 'Upload document'}
-            </Button>
-          </form>
+              <Button type="submit" size="sm" disabled={!isConfigured || isUploading}>
+                {isUploading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="mr-2 h-4 w-4" />
+                )}
+                {isUploading ? 'Indexing…' : 'Upload document'}
+              </Button>
+            </form>
+          </section>
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <div className="border-b px-5 py-4 text-sm text-muted-foreground sm:px-6">
             An organization owner or admin can add knowledge sources.
-          </p>
+          </div>
         )}
 
-        <div className="space-y-2 border-t pt-4">
+        <section className="p-5 sm:p-6" aria-labelledby="indexed-knowledge">
+          <h2 id="indexed-knowledge" className="mb-3 text-sm font-semibold">
+            Indexed knowledge
+          </h2>
           {sources.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No knowledge sources yet.</p>
+            <div className="rounded-lg border border-dashed px-4 py-10 text-center">
+              <FileText className="mx-auto mb-3 h-5 w-5 text-muted-foreground" />
+              <p className="text-sm font-medium">No knowledge sources yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add the first onboarding document to start answering questions.
+              </p>
+            </div>
           ) : (
-            sources.map((source) => (
-              <div
-                key={source.id}
-                className="flex items-start justify-between gap-3 rounded-md border p-3"
-              >
-                <div className="flex min-w-0 gap-3">
-                  <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{source.name}</p>
-                    <p className="text-xs text-muted-foreground">{formatBytes(source.sizeBytes)}</p>
-                    {source.errorMessage && (
-                      <p className="mt-1 text-xs text-destructive">{source.errorMessage}</p>
-                    )}
+            <div className="max-h-[32rem] divide-y overflow-y-auto rounded-lg border">
+              {sources.map((source) => (
+                <div key={source.id} className="flex items-start justify-between gap-4 p-4">
+                  <div className="flex min-w-0 gap-3">
+                    <div className="rounded-md bg-muted p-2 text-muted-foreground">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{source.name}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {formatBytes(source.sizeBytes)} · Added {formatDate(source.createdAt)}
+                      </p>
+                      {source.errorMessage && (
+                        <details className="mt-2 text-xs">
+                          <summary className="cursor-pointer font-medium text-destructive">
+                            Indexing details
+                          </summary>
+                          <p className="mt-1 max-w-xl leading-5 text-muted-foreground">
+                            {source.errorMessage}
+                          </p>
+                        </details>
+                      )}
+                    </div>
                   </div>
+                  <Badge
+                    variant={
+                      source.status === 'FAILED'
+                        ? 'destructive'
+                        : source.status === 'READY'
+                          ? 'secondary'
+                          : 'outline'
+                    }
+                  >
+                    {STATUS_LABELS[source.status]}
+                  </Badge>
                 </div>
-                <Badge
-                  variant={
-                    source.status === 'FAILED'
-                      ? 'destructive'
-                      : source.status === 'READY'
-                        ? 'secondary'
-                        : 'outline'
-                  }
-                >
-                  {STATUS_LABELS[source.status]}
-                </Badge>
-              </div>
-            ))
+              ))}
+            </div>
           )}
-        </div>
+        </section>
       </CardContent>
     </Card>
   );

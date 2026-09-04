@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,7 @@ interface PageProps {
 export default function OrganizationSettingsPage({ params }: PageProps) {
   const { organizationId } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -66,13 +67,19 @@ export default function OrganizationSettingsPage({ params }: PageProps) {
 
   const role = roleInfo?.role ?? 'MEMBER';
   const canManage = role === 'OWNER' || role === 'ADMIN';
+  const requestedSection = searchParams.get('section');
+  const initialSection = ['general', 'members', 'departments', 'domains'].includes(
+    requestedSection ?? '',
+  )
+    ? requestedSection!
+    : 'general';
 
   return (
     <PageContainer>
       <div className="mx-auto max-w-4xl space-y-8 px-4 py-8">
         <PageHeader title="Organization settings" description={organization.name} />
 
-        <Tabs defaultValue="general">
+        <Tabs defaultValue={initialSection}>
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="members">Members</TabsTrigger>
