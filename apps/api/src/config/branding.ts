@@ -1,5 +1,5 @@
 /**
- * Branding configuration for App Starter API
+ * Branding configuration for the Onboarding Brain API
  *
  * This file centralizes all branding-related strings and values.
  * Used for easy rebranding and future localization/i18n support.
@@ -9,7 +9,7 @@ export const branding = {
   /**
    * Application name
    */
-  appName: 'App Starter',
+  appName: 'Onboarding Brain',
 
   /**
    * Email configuration
@@ -19,22 +19,22 @@ export const branding = {
      * Email addresses
      */
     addresses: {
-      from: 'noreply@app-starter.local',
-      support: 'support@app-starter.local',
-      domain: 'app-starter.local',
+      from: 'noreply@onboarding-brain.local',
+      support: 'support@onboarding-brain.local',
+      domain: 'onboarding-brain.local',
     },
 
     /**
      * Default sender names
      */
-    fromName: 'App Starter',
-    fromNameDev: 'App Starter Dev',
+    fromName: 'Onboarding Brain',
+    fromNameDev: 'Onboarding Brain Dev',
 
     /**
      * Logo and alt text
      */
     logo: {
-      altText: 'App Starter Logo',
+      altText: 'Onboarding Brain Logo',
       defaultAltText: 'Organization Logo',
     },
 
@@ -42,8 +42,8 @@ export const branding = {
      * Email template text
      */
     templates: {
-      defaultTitle: 'App Starter',
-      copyright: (year: number) => `© ${year} App Starter. All rights reserved.`,
+      defaultTitle: 'Onboarding Brain',
+      copyright: (year: number) => `© ${year} Onboarding Brain. All rights reserved.`,
       helpText: (contactEmail: string) => `Need help? Contact us at ${contactEmail}`,
     },
   },
@@ -52,13 +52,13 @@ export const branding = {
    * Email subject lines
    */
   emailSubjects: {
-    verification: 'Verify your App Starter email address',
-    passwordReset: 'App Starter - Password Reset Request',
-    otpVerification: 'Your App Starter Verification Code',
+    verification: 'Verify your Onboarding Brain email address',
+    passwordReset: 'Onboarding Brain - Password Reset Request',
+    otpVerification: 'Your Onboarding Brain Verification Code',
     userInvitation: (organizationName: string) =>
-      `You're invited to join ${organizationName} on App Starter`,
+      `You're invited to join ${organizationName} on Onboarding Brain`,
     invitationAccepted: (organizationName: string) =>
-      `Welcome to ${organizationName} on App Starter`,
+      `Welcome to ${organizationName} on Onboarding Brain`,
   },
 
   /**
@@ -67,25 +67,26 @@ export const branding = {
   emailBody: {
     verification: {
       greeting: (firstName: string) => `Hi ${firstName},`,
-      signupThanks: 'Thank you for signing up for App Starter!',
+      signupThanks: 'Thank you for signing up for Onboarding Brain!',
       verifyPrompt: 'Please verify your email address by clicking the button below:',
-      ignoreNotice: "If you didn't create a App Starter account, you can safely ignore this email.",
+      ignoreNotice:
+        "If you didn't create an Onboarding Brain account, you can safely ignore this email.",
     },
     passwordReset: {
       resetPrompt:
-        'We received a request to reset your password for your App Starter account. If you made this request, click the button below to reset your password:',
+        'We received a request to reset your Onboarding Brain password. If you made this request, click the button below to reset it:',
     },
     otpVerification: {
-      codePrompt: 'Your verification code for App Starter is:',
+      codePrompt: 'Your Onboarding Brain verification code is:',
     },
     userInvitation: {
       invitationText: (inviterName: string, organizationName: string, roleName: string) =>
-        `${inviterName} has invited you to join ${organizationName} on App Starter as a ${roleName}.`,
-      welcomeText: 'Welcome to App Starter!',
+        `${inviterName} has invited you to join ${organizationName} on Onboarding Brain as a ${roleName}.`,
+      welcomeText: 'Welcome to Onboarding Brain!',
     },
     invitationAccepted: {
       welcomeText: (organizationName: string, roleName: string) =>
-        `Congratulations! You have successfully joined ${organizationName} on App Starter as a ${roleName}.`,
+        `You have joined ${organizationName} on Onboarding Brain as a ${roleName}.`,
     },
   },
 
@@ -93,7 +94,7 @@ export const branding = {
    * Service defaults
    */
   service: {
-    defaultOrganizationName: 'App Starter',
+    defaultOrganizationName: 'Onboarding Brain',
   },
 
   /**

@@ -1,8 +1,8 @@
 {
-  "name": "app-starter",
+  "name": "onboarding-brain",
   "version": "0.0.0",
   "private": true,
-  "description": "A multi-tenant SaaS starter: NestJS, Next.js, and Prisma in a Turborepo",
+  "description": "Open-source employee onboarding Q&A powered by Cognee",
   "scripts": {
     "prepare": "husky",
     "bootstrap": "./scripts/bootstrap.sh",
