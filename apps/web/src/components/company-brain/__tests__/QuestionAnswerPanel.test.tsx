@@ -32,6 +32,7 @@ describe('QuestionAnswerPanel', () => {
     render(<QuestionAnswerPanel isConfigured onAsk={onAsk} />);
 
     const input = screen.getByLabelText('Question') as HTMLTextAreaElement;
+    expect(input).toHaveAttribute('maxlength', '8000');
     Object.defineProperty(input, 'scrollHeight', {
       configurable: true,
       get: () => (input.value ? 240 : 44),
@@ -40,6 +41,7 @@ describe('QuestionAnswerPanel', () => {
     fireEvent.change(input, { target: { value: 'First line\nSecond line' } });
     expect(input.style.height).toBe('160px');
     expect(input.style.overflowY).toBe('auto');
+    expect(input).toHaveClass('[scrollbar-width:none]', '[&::-webkit-scrollbar]:hidden');
 
     await user.click(screen.getByRole('button', { name: 'Ask question' }));
 

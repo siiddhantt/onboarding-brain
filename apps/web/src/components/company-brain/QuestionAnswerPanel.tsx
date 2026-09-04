@@ -132,7 +132,7 @@ export function QuestionAnswerPanel({
         onSubmit={handleSubmit}
         className="sticky bottom-0 z-10 shrink-0 bg-background/95 pb-1 pt-3 backdrop-blur"
       >
-        <div className="rounded-2xl border bg-card p-1.5 shadow-sm transition-[border-color,box-shadow] focus-within:border-foreground/25 focus-within:ring-1 focus-within:ring-ring focus-within:ring-offset-2 sm:p-2">
+        <div className="rounded-2xl border border-border/90 bg-card p-1.5 shadow-sm transition-[border-color,box-shadow] focus-within:border-foreground/25 focus-within:shadow-md dark:focus-within:border-foreground/15 sm:p-2">
           <Label htmlFor="company-brain-question" className="sr-only">
             Question
           </Label>
@@ -150,7 +150,7 @@ export function QuestionAnswerPanel({
             placeholder="How do I submit an expense report?"
             disabled={!isConfigured || isAsking}
             aria-describedby="company-brain-question-error"
-            className="block min-h-11 max-h-40 w-full resize-none bg-transparent px-2.5 py-2.5 text-[16px] leading-6 text-foreground outline-none placeholder:text-[13px] placeholder:font-normal placeholder:tracking-[-0.01em] placeholder:text-muted-foreground/55 disabled:cursor-not-allowed disabled:opacity-50 sm:placeholder:text-sm md:text-sm"
+            className="block min-h-11 max-h-40 w-full resize-none overscroll-contain bg-transparent px-2.5 py-2.5 text-[16px] leading-6 text-foreground outline-none [scrollbar-width:none] placeholder:text-[13px] placeholder:font-normal placeholder:tracking-[-0.01em] placeholder:text-muted-foreground/55 disabled:cursor-not-allowed disabled:opacity-50 sm:placeholder:text-sm md:text-sm [&::-webkit-scrollbar]:hidden"
           />
           <div className="flex items-center justify-between gap-3 px-2 pb-0.5 pt-0.5">
             <p className="text-[11px] leading-4 text-muted-foreground/65 sm:text-xs">
