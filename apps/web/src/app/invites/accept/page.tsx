@@ -138,7 +138,7 @@ export default function AcceptInvitePage() {
             <CardTitle>Accept Invitation</CardTitle>
             <CardDescription>
               {isAuthenticated
-                ? 'You will be added to the organization with editor permissions.'
+                ? 'You will be added to the organization with the role in this invitation.'
                 : 'We will send you a verification email to complete the process.'}
             </CardDescription>
           </CardHeader>

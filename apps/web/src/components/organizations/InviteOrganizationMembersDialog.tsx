@@ -36,7 +36,7 @@ import { organizationsApi, UserOrganization, OrgRole } from '@/lib/organizations
 import { Loader2, Copy, Check, Mail } from 'lucide-react';
 
 const inviteSchema = z.object({
-  organizationId: z.string().min(1, 'Please select a organization'),
+  organizationId: z.string().min(1, 'Please select an organization'),
   email: z
     .string()
     .email('Email must be a valid email address')
@@ -44,7 +44,7 @@ const inviteSchema = z.object({
     .optional()
     .or(z.literal('')),
   role: z.nativeEnum(OrgRole).refine((r) => r === OrgRole.ADMIN || r === OrgRole.MEMBER, {
-    message: 'Choose Admin or Editor',
+    message: 'Choose Admin or Member',
   }),
 });
 
@@ -98,9 +98,9 @@ export function InviteOrganizationMembersDialog({
     setIsLoadingOrganizations(true);
     try {
       const response = await organizationsApi.getUserOrganizations();
-      // Filter to only organizations where user is OWNER, ADMIN, or MEMBER
+      // Only owners and admins can manage organization invitations.
       const manageableOrganizations = response.organizations.filter(
-        (g) => g.role === 'OWNER' || g.role === 'ADMIN' || g.role === 'MEMBER',
+        (organization) => organization.role === 'OWNER' || organization.role === 'ADMIN',
       );
       setOrganizations(manageableOrganizations);
 
@@ -171,9 +171,9 @@ export function InviteOrganizationMembersDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Invite Organizers</DialogTitle>
+            <DialogTitle>Invite members</DialogTitle>
             <DialogDescription>
-              You need to be an owner, admin, or editor of a organization to invite organizers.
+              You need to be an owner or admin of an organization to invite members.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -194,7 +194,7 @@ export function InviteOrganizationMembersDialog({
               <DialogDescription>
                 {createdInvite.email
                   ? `Invitation email has been sent to ${createdInvite.email}`
-                  : 'Share this link with collaborators to invite them to your organization'}
+                  : 'Share this link to invite someone to your organization'}
               </DialogDescription>
             </DialogHeader>
 
@@ -228,10 +228,9 @@ export function InviteOrganizationMembersDialog({
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>Invite Organizers</DialogTitle>
+              <DialogTitle>Invite members</DialogTitle>
               <DialogDescription>
-                Create an invitation link to add organizers to your organization. You can send it
-                via email or share the link directly.
+                Send an invitation by email or create a link to share directly.
               </DialogDescription>
             </DialogHeader>
 
@@ -251,7 +250,7 @@ export function InviteOrganizationMembersDialog({
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select a organization" />
+                              <SelectValue placeholder="Select an organization" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -282,7 +281,7 @@ export function InviteOrganizationMembersDialog({
                         </FormControl>
                         <SelectContent>
                           <SelectItem value={OrgRole.ADMIN}>Admin</SelectItem>
-                          <SelectItem value={OrgRole.MEMBER}>Editor</SelectItem>
+                          <SelectItem value={OrgRole.MEMBER}>Member</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormDescription>

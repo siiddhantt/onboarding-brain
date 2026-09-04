@@ -25,8 +25,14 @@ export function AppSideNav() {
     >
       <SidebarNav
         activePath={pathname ?? ''}
-        LinkComponent={({ to, className, children, active }) => (
-          <Link href={to} className={className} aria-current={active ? 'page' : undefined}>
+        LinkComponent={({ to, className, children, active, label }) => (
+          <Link
+            href={to}
+            className={className}
+            aria-current={active ? 'page' : undefined}
+            aria-label={label}
+            title={label}
+          >
             {children}
           </Link>
         )}
