@@ -9,6 +9,7 @@ import {
   KnowledgeIngestionRequest,
   KnowledgeIngestionResult,
 } from '../common/knowledge/knowledge-engine.interface';
+import { cogneeDatasetName } from './cognee-dataset';
 import { COGNEE_RUNTIME_FACTORY, CogneeRuntime, CogneeRuntimeFactory } from './cognee.runtime';
 
 @Injectable()
@@ -29,7 +30,7 @@ export class CogneeService implements KnowledgeEngine, OnModuleDestroy {
     const { client } = await this.getRuntime();
     const result = await client.remember(
       this.toCogneeInput(request.content),
-      this.datasetNameFor(request.organizationId),
+      cogneeDatasetName(this.configService, request.organizationId),
       { tenant: request.organizationId },
     );
 
@@ -41,7 +42,7 @@ export class CogneeService implements KnowledgeEngine, OnModuleDestroy {
   async ask(organizationId: string, question: string): Promise<KnowledgeEngineAnswer> {
     const { client } = await this.getRuntime();
     const response = await client.search(question, {
-      datasets: [this.datasetNameFor(organizationId)],
+      datasets: [cogneeDatasetName(this.configService, organizationId)],
       searchType: 'HYBRID_COMPLETION',
     });
     const answer = this.extractAnswer(response.result);
@@ -101,11 +102,6 @@ export class CogneeService implements KnowledgeEngine, OnModuleDestroy {
       llmModel: this.configService.get<string>('OPENAI_MODEL', 'gpt-4o-mini'),
       llmApiKey: this.configService.get<string>('OPENAI_TOKEN'),
     };
-  }
-
-  private datasetNameFor(organizationId: string): string {
-    const prefix = this.configService.get<string>('COGNEE_DATASET_PREFIX', 'organization');
-    return `${prefix}-${organizationId}`;
   }
 
   private toCogneeInput(content: KnowledgeContent) {
