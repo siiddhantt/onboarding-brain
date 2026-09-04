@@ -1,11 +1,13 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
   Post,
+  Put,
   Request,
   UploadedFile,
   UseGuards,
@@ -72,6 +74,42 @@ export class CompanyBrainController {
     @UploadedFile() file?: Express.Multer.File,
   ): Promise<KnowledgeSource> {
     return this.companyBrainService.uploadDocument(req.user.sub, organizationId, file);
+  }
+
+  @Put('sources/:sourceId/content')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: MAX_KNOWLEDGE_DOCUMENT_BYTES },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiOperation({ summary: 'Replace the indexed content of a knowledge source' })
+  async replaceSourceContent(
+    @Request() req: { user: TokenPayload },
+    @Param('organizationId') organizationId: string,
+    @Param('sourceId') sourceId: string,
+    @UploadedFile() file?: Express.Multer.File,
+  ): Promise<KnowledgeSource> {
+    return this.companyBrainService.replaceDocument(req.user.sub, organizationId, sourceId, file);
+  }
+
+  @Delete('sources/:sourceId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove a knowledge source and its derived knowledge' })
+  async removeSource(
+    @Request() req: { user: TokenPayload },
+    @Param('organizationId') organizationId: string,
+    @Param('sourceId') sourceId: string,
+  ): Promise<void> {
+    await this.companyBrainService.removeSource(req.user.sub, organizationId, sourceId);
   }
 
   @Post('questions')

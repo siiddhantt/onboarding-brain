@@ -30,6 +30,24 @@ export class CompanyBrainApi {
     );
   }
 
+  async replaceSourceContent(
+    organizationId: string,
+    sourceId: string,
+    file: File,
+  ): Promise<KnowledgeSource> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return apiClient.put<KnowledgeSource>(
+      `/api/organizations/${organizationId}/brain/sources/${sourceId}/content`,
+      formData,
+    );
+  }
+
+  async removeSource(organizationId: string, sourceId: string): Promise<void> {
+    await apiClient.delete(`/api/organizations/${organizationId}/brain/sources/${sourceId}`);
+  }
+
   async ask(organizationId: string, question: string): Promise<CompanyBrainAnswer> {
     const request: AskCompanyBrainRequest = { question };
     return apiClient.post<CompanyBrainAnswer>(

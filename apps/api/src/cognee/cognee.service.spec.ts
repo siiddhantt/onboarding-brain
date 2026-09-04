@@ -43,9 +43,13 @@ describe('CogneeService', () => {
   beforeEach(() => {
     runtime = {
       client: {
+        forget: jest.fn().mockResolvedValue({}),
         warm: jest.fn().mockResolvedValue(undefined),
         remember: jest.fn().mockResolvedValue(rememberResult),
         search: jest.fn().mockResolvedValue(searchResult),
+        update: jest.fn().mockResolvedValue({
+          newData: [{ id: 'document-2' }],
+        }),
       },
       shutdown: jest.fn(),
     };
@@ -95,10 +99,57 @@ describe('CogneeService', () => {
       },
     });
 
-    expect(actual).toEqual({ providerReference: 'document-1' });
+    expect(actual).toEqual({
+      providerReference: 'document-1',
+      providerContainerReference: 'dataset-1',
+    });
     expect(runtime.client.remember).toHaveBeenCalledWith(
       { type: 'binary', bytes, name: 'handbook.pdf' },
       `organization-${organizationId}`,
+      { tenant: organizationId },
+    );
+  });
+
+  it('replaces one item in its organization dataset', async () => {
+    const bytes = Buffer.from('updated document');
+
+    const actual = await service.replace({
+      organizationId,
+      providerReference: 'document-1',
+      providerContainerReference: 'dataset-1',
+      content: {
+        kind: 'binary',
+        bytes,
+        fileName: 'handbook-v2.pdf',
+        mimeType: 'application/pdf',
+      },
+    });
+
+    expect(runtime.client.update).toHaveBeenCalledWith(
+      'document-1',
+      { type: 'binary', bytes, name: 'handbook-v2.pdf' },
+      `organization-${organizationId}`,
+      { tenant: organizationId },
+    );
+    expect(actual).toEqual({
+      providerReference: 'document-2',
+      providerContainerReference: 'dataset-1',
+    });
+  });
+
+  it('removes one item and its derived knowledge from the organization dataset', async () => {
+    await service.remove({
+      organizationId,
+      providerReference: 'document-1',
+      providerContainerReference: 'dataset-1',
+    });
+
+    expect(runtime.client.forget).toHaveBeenCalledWith(
+      {
+        kind: 'item',
+        dataId: 'document-1',
+        dataset: { name: `organization-${organizationId}` },
+      },
       { tenant: organizationId },
     );
   });

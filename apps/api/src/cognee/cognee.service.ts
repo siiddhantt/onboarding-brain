@@ -8,6 +8,8 @@ import {
   KnowledgeEngineCitation,
   KnowledgeIngestionRequest,
   KnowledgeIngestionResult,
+  KnowledgeItemRequest,
+  KnowledgeReplacementRequest,
 } from '../common/knowledge/knowledge-engine.interface';
 import { cogneeDatasetName } from './cognee-dataset';
 import { COGNEE_RUNTIME_FACTORY, CogneeRuntime, CogneeRuntimeFactory } from './cognee.runtime';
@@ -33,10 +35,43 @@ export class CogneeService implements KnowledgeEngine, OnModuleDestroy {
       cogneeDatasetName(this.configService, request.organizationId),
       { tenant: request.organizationId },
     );
+    const providerReference = result.items[0]?.id;
+
+    if (!providerReference) {
+      throw new ServiceUnavailableException('Cognee did not return an item reference.');
+    }
 
     return {
-      providerReference: result.items[0]?.id ?? result.dataset_id,
+      providerReference,
+      providerContainerReference: result.dataset_id,
     };
+  }
+
+  async replace(request: KnowledgeReplacementRequest): Promise<KnowledgeIngestionResult> {
+    const { client } = await this.getRuntime();
+    const result = await client.update(
+      request.providerReference,
+      this.toCogneeInput(request.content),
+      cogneeDatasetName(this.configService, request.organizationId),
+      { tenant: request.organizationId },
+    );
+
+    return {
+      providerReference: result.newData[0]?.id ?? request.providerReference,
+      providerContainerReference: request.providerContainerReference,
+    };
+  }
+
+  async remove(request: KnowledgeItemRequest): Promise<void> {
+    const { client } = await this.getRuntime();
+    await client.forget(
+      {
+        kind: 'item',
+        dataId: request.providerReference,
+        dataset: { name: cogneeDatasetName(this.configService, request.organizationId) },
+      },
+      { tenant: request.organizationId },
+    );
   }
 
   async ask(organizationId: string, question: string): Promise<KnowledgeEngineAnswer> {

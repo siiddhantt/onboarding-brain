@@ -25,6 +25,9 @@ describe('CompanyBrainService', () => {
     sizeBytes: 1024,
     status: KnowledgeSourceStatus.PROCESSING,
     providerReference: null,
+    providerContainerReference: null,
+    version: 1,
+    lastIndexedAt: null,
     errorMessage: null,
     archivedAt: null,
     createdAt,
@@ -56,11 +59,14 @@ describe('CompanyBrainService', () => {
     prisma = {
       knowledgeSource: {
         create: jest.fn().mockResolvedValue(buildSource()),
+        findFirst: jest.fn().mockResolvedValue(buildSource()),
         findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         update: jest.fn().mockImplementation(({ data }) =>
           Promise.resolve(
             buildSource({
               ...data,
+              version: data.version?.increment ? 2 : 1,
               updatedAt: new Date('2026-09-03T06:01:00.000Z'),
             }),
           ),
@@ -72,7 +78,15 @@ describe('CompanyBrainService', () => {
     };
     knowledgeEngine = {
       isConfigured: jest.fn().mockReturnValue(true),
-      ingest: jest.fn().mockResolvedValue({ providerReference: 'document-1' }),
+      ingest: jest.fn().mockResolvedValue({
+        providerReference: 'document-1',
+        providerContainerReference: 'dataset-1',
+      }),
+      replace: jest.fn().mockResolvedValue({
+        providerReference: 'document-2',
+        providerContainerReference: 'dataset-1',
+      }),
+      remove: jest.fn().mockResolvedValue(undefined),
       ask: jest.fn().mockResolvedValue({
         status: 'ANSWERED',
         answer: 'Use the finance portal.',
@@ -161,6 +175,8 @@ describe('CompanyBrainService', () => {
         data: {
           status: KnowledgeSourceStatus.READY,
           providerReference: 'document-1',
+          providerContainerReference: 'dataset-1',
+          lastIndexedAt: expect.any(Date),
           errorMessage: null,
         },
       });
@@ -220,6 +236,168 @@ describe('CompanyBrainService', () => {
       );
 
       expect(prisma.knowledgeSource.create.mock.calls[0][0].data.name).toBe('handbook.pdf');
+    });
+  });
+
+  describe('replaceDocument', () => {
+    const readySource = () =>
+      buildSource({
+        status: KnowledgeSourceStatus.READY,
+        providerReference: 'document-1',
+        providerContainerReference: 'dataset-1',
+        lastIndexedAt: createdAt,
+      });
+
+    it('replaces provider content while preserving the application source identity', async () => {
+      prisma.knowledgeSource.findFirst.mockResolvedValue(readySource());
+      const replacement = buildFile({
+        originalname: 'Employee handbook v2.pdf',
+        size: 2048,
+        buffer: Buffer.from('updated document'),
+      });
+
+      const actual = await service.replaceDocument(userId, organizationId, 'source-1', replacement);
+
+      expect(prisma.knowledgeSource.findFirst).toHaveBeenCalledWith({
+        where: { id: 'source-1', organizationId, archivedAt: null },
+      });
+      expect(prisma.knowledgeSource.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'source-1',
+          organizationId,
+          archivedAt: null,
+          status: KnowledgeSourceStatus.READY,
+          version: 1,
+        },
+        data: { status: KnowledgeSourceStatus.UPDATING, errorMessage: null },
+      });
+      expect(knowledgeEngine.replace).toHaveBeenCalledWith({
+        organizationId,
+        providerReference: 'document-1',
+        providerContainerReference: 'dataset-1',
+        content: {
+          kind: 'binary',
+          bytes: replacement.buffer,
+          fileName: 'Employee handbook v2.pdf',
+          mimeType: 'application/pdf',
+        },
+      });
+      expect(prisma.knowledgeSource.update).toHaveBeenCalledWith({
+        where: { id: 'source-1' },
+        data: expect.objectContaining({
+          name: 'Employee handbook v2.pdf',
+          status: KnowledgeSourceStatus.READY,
+          providerReference: 'document-2',
+          providerContainerReference: 'dataset-1',
+          version: { increment: 1 },
+          lastIndexedAt: expect.any(Date),
+          errorMessage: null,
+        }),
+      });
+      expect(actual).toMatchObject({ id: 'source-1', version: 2, status: 'READY' });
+    });
+
+    it('marks the source failed when provider replacement has an uncertain outcome', async () => {
+      prisma.knowledgeSource.findFirst.mockResolvedValue(readySource());
+      knowledgeEngine.replace.mockRejectedValue(new Error('provider secret'));
+
+      await expect(
+        service.replaceDocument(userId, organizationId, 'source-1', buildFile()),
+      ).rejects.toThrow('The new version could not be indexed. Review the source before retrying.');
+
+      expect(prisma.knowledgeSource.updateMany).toHaveBeenLastCalledWith({
+        where: {
+          id: 'source-1',
+          organizationId,
+          status: KnowledgeSourceStatus.UPDATING,
+          archivedAt: null,
+        },
+        data: {
+          status: KnowledgeSourceStatus.FAILED,
+          errorMessage: 'The new version could not be indexed. Review the source before retrying.',
+        },
+      });
+    });
+
+    it('allows only owners and admins to replace sources', async () => {
+      organizationsService.getUserRoleInOrganization.mockResolvedValue(OrgRole.MEMBER);
+
+      await expect(
+        service.replaceDocument(userId, organizationId, 'source-1', buildFile()),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.knowledgeSource.findFirst).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('removeSource', () => {
+    const readySource = () =>
+      buildSource({
+        status: KnowledgeSourceStatus.READY,
+        providerReference: 'document-1',
+        providerContainerReference: 'dataset-1',
+      });
+
+    it('removes derived provider knowledge before archiving the local source', async () => {
+      prisma.knowledgeSource.findFirst.mockResolvedValue(readySource());
+
+      await service.removeSource(userId, organizationId, 'source-1');
+
+      expect(knowledgeEngine.remove).toHaveBeenCalledWith({
+        organizationId,
+        providerReference: 'document-1',
+        providerContainerReference: 'dataset-1',
+      });
+      expect(knowledgeEngine.remove.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.knowledgeSource.update.mock.invocationCallOrder[0],
+      );
+      expect(prisma.knowledgeSource.update).toHaveBeenCalledWith({
+        where: { id: 'source-1' },
+        data: {
+          status: KnowledgeSourceStatus.READY,
+          archivedAt: expect.any(Date),
+          errorMessage: null,
+        },
+      });
+    });
+
+    it('keeps the source active when provider removal fails', async () => {
+      prisma.knowledgeSource.findFirst.mockResolvedValue(readySource());
+      knowledgeEngine.remove.mockRejectedValue(new Error('provider secret'));
+
+      await expect(service.removeSource(userId, organizationId, 'source-1')).rejects.toThrow(
+        'The knowledge source could not be removed. Try again.',
+      );
+
+      expect(prisma.knowledgeSource.update).not.toHaveBeenCalled();
+      expect(prisma.knowledgeSource.updateMany).toHaveBeenLastCalledWith({
+        where: {
+          id: 'source-1',
+          organizationId,
+          status: KnowledgeSourceStatus.REMOVING,
+          archivedAt: null,
+        },
+        data: {
+          status: KnowledgeSourceStatus.READY,
+          errorMessage: 'The knowledge source could not be removed. Try again.',
+        },
+      });
+    });
+
+    it('does not claim a source is ready when archival fails after provider removal', async () => {
+      prisma.knowledgeSource.findFirst.mockResolvedValue(readySource());
+      prisma.knowledgeSource.update.mockRejectedValue(new Error('database unavailable'));
+
+      await expect(service.removeSource(userId, organizationId, 'source-1')).rejects.toThrow(
+        'The knowledge source could not be removed. Try again.',
+      );
+
+      expect(knowledgeEngine.remove).toHaveBeenCalledTimes(1);
+      expect(prisma.knowledgeSource.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.knowledgeSource.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { status: KnowledgeSourceStatus.REMOVING, errorMessage: null },
+        }),
+      );
     });
   });
 

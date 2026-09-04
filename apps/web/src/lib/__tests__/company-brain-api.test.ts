@@ -42,6 +42,28 @@ describe('CompanyBrainApi', () => {
     expect(body.get('file')).toBe(file);
   });
 
+  it('replaces source content as multipart form data', async () => {
+    const file = new File(['updated handbook'], 'handbook-v2.txt', { type: 'text/plain' });
+    (apiClient.put as jest.Mock).mockResolvedValue({ id: 'source-1', version: 2 });
+
+    await companyBrainApi.replaceSourceContent(organizationId, 'source-1', file);
+
+    const [endpoint, body] = (apiClient.put as jest.Mock).mock.calls[0];
+    expect(endpoint).toBe(`/api/organizations/${organizationId}/brain/sources/source-1/content`);
+    expect(body).toBeInstanceOf(FormData);
+    expect(body.get('file')).toBe(file);
+  });
+
+  it('removes a source through its organization-scoped route', async () => {
+    (apiClient.delete as jest.Mock).mockResolvedValue(undefined);
+
+    await companyBrainApi.removeSource(organizationId, 'source-1');
+
+    expect(apiClient.delete).toHaveBeenCalledWith(
+      `/api/organizations/${organizationId}/brain/sources/source-1`,
+    );
+  });
+
   it('submits a question without provider-specific fields', async () => {
     (apiClient.post as jest.Mock).mockResolvedValue({ status: 'NO_ANSWER' });
 

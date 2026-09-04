@@ -15,7 +15,15 @@ describe('CompanyBrainController (e2e)', () => {
   const testEmail = `test-e2e-company-brain-${testRun}@example.com`;
   const knowledgeEngine: jest.Mocked<KnowledgeEngine> = {
     isConfigured: jest.fn().mockReturnValue(true),
-    ingest: jest.fn().mockResolvedValue({ providerReference }),
+    ingest: jest.fn().mockResolvedValue({
+      providerReference,
+      providerContainerReference: 'provider-dataset-1',
+    }),
+    replace: jest.fn().mockResolvedValue({
+      providerReference: 'provider-document-2',
+      providerContainerReference: 'provider-dataset-1',
+    }),
+    remove: jest.fn().mockResolvedValue(undefined),
     ask: jest.fn().mockResolvedValue({
       status: 'ANSWERED',
       answer: 'Submit the form through the finance portal.',
@@ -99,7 +107,7 @@ describe('CompanyBrainController (e2e)', () => {
       .expect({ isConfigured: true });
   });
 
-  it('uploads, indexes, lists, and cites an organization document', async () => {
+  it('uploads, indexes, lists, cites, replaces, and removes an organization document', async () => {
     const uploadResponse = await request(app.getHttpServer())
       .post(`/api/organizations/${organizationId}/brain/sources/documents`)
       .set('Authorization', `Bearer ${authToken}`)
@@ -114,6 +122,7 @@ describe('CompanyBrainController (e2e)', () => {
       createdById: userId,
       name: 'expense-policy.txt',
       status: KnowledgeSourceStatus.READY,
+      version: 1,
     });
     expect(knowledgeEngine.ingest).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -163,6 +172,45 @@ describe('CompanyBrainController (e2e)', () => {
         },
       ],
     });
+
+    const replaceResponse = await request(app.getHttpServer())
+      .put(`/api/organizations/${organizationId}/brain/sources/${uploadResponse.body.id}/content`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .attach('file', Buffer.from('Expense reports are now due within 14 days.'), {
+        filename: 'expense-policy-v2.txt',
+        contentType: 'text/plain',
+      })
+      .expect(200);
+    expect(knowledgeEngine.replace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId,
+        providerReference,
+        providerContainerReference: 'provider-dataset-1',
+        content: expect.objectContaining({ fileName: 'expense-policy-v2.txt' }),
+      }),
+    );
+    expect(replaceResponse.body).toMatchObject({
+      id: uploadResponse.body.id,
+      name: 'expense-policy-v2.txt',
+      status: KnowledgeSourceStatus.READY,
+      version: 2,
+    });
+
+    await request(app.getHttpServer())
+      .delete(`/api/organizations/${organizationId}/brain/sources/${uploadResponse.body.id}`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .expect(204);
+    expect(knowledgeEngine.remove).toHaveBeenCalledWith({
+      organizationId,
+      providerReference: 'provider-document-2',
+      providerContainerReference: 'provider-dataset-1',
+    });
+
+    const emptyListResponse = await request(app.getHttpServer())
+      .get(`/api/organizations/${organizationId}/brain/sources`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .expect(200);
+    expect(emptyListResponse.body).toEqual({ items: [], total: 0 });
   });
 
   it('rejects questions that become too short after trimming', () => {

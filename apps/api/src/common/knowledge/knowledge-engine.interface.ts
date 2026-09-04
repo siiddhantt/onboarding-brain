@@ -19,7 +19,18 @@ export interface KnowledgeIngestionRequest {
 }
 
 export interface KnowledgeIngestionResult {
-  providerReference: string | null;
+  providerReference: string;
+  providerContainerReference: string | null;
+}
+
+export interface KnowledgeItemRequest {
+  organizationId: string;
+  providerReference: string;
+  providerContainerReference: string | null;
+}
+
+export interface KnowledgeReplacementRequest extends KnowledgeItemRequest {
+  content: KnowledgeContent;
 }
 
 export interface KnowledgeEngineCitation {
@@ -44,5 +55,7 @@ export interface KnowledgeEngineAnswer {
 export interface KnowledgeEngine {
   isConfigured(): boolean;
   ingest(request: KnowledgeIngestionRequest): Promise<KnowledgeIngestionResult>;
+  replace(request: KnowledgeReplacementRequest): Promise<KnowledgeIngestionResult>;
+  remove(request: KnowledgeItemRequest): Promise<void>;
   ask(organizationId: string, question: string): Promise<KnowledgeEngineAnswer>;
 }

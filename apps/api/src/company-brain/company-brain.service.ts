@@ -1,9 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import {
@@ -30,7 +32,11 @@ import { PrismaService } from '../prisma/prisma.service';
 const MANAGE_ROLES: readonly OrgRole[] = [OrgRole.OWNER, OrgRole.ADMIN];
 const MEMBER_ROLES: readonly OrgRole[] = [OrgRole.OWNER, OrgRole.ADMIN, OrgRole.MEMBER];
 const FAILED_INGESTION_MESSAGE = 'The document could not be indexed. Try uploading it again.';
+const FAILED_REPLACEMENT_MESSAGE =
+  'The new version could not be indexed. Review the source before retrying.';
+const FAILED_REMOVAL_MESSAGE = 'The knowledge source could not be removed. Try again.';
 const FAILED_QUESTION_MESSAGE = 'The company brain could not answer right now. Try again.';
+const SOURCE_BUSY_MESSAGE = 'This knowledge source is already being changed. Try again shortly.';
 const SUPPORTED_DOCUMENT_MIME_TYPES = new Set<string>(KNOWLEDGE_DOCUMENT_MIME_TYPES);
 
 interface ValidatedDocument {
@@ -110,6 +116,8 @@ export class CompanyBrainService {
         data: {
           status: KnowledgeSourceStatus.READY,
           providerReference: result.providerReference,
+          providerContainerReference: result.providerContainerReference,
+          lastIndexedAt: new Date(),
           errorMessage: null,
         },
       });
@@ -130,6 +138,123 @@ export class CompanyBrainService {
       });
 
       return this.toSourceResponse(failedSource);
+    }
+  }
+
+  async replaceDocument(
+    userId: string,
+    organizationId: string,
+    sourceId: string,
+    file?: Express.Multer.File,
+  ): Promise<KnowledgeSource> {
+    await this.requireRole(userId, organizationId, MANAGE_ROLES, 'replace knowledge sources');
+    const document = this.validateDocument(file);
+
+    if (!this.knowledgeEngine.isConfigured()) {
+      throw new ServiceUnavailableException(
+        'The knowledge engine is not configured for this environment.',
+      );
+    }
+
+    const source = await this.findActiveSource(organizationId, sourceId);
+    await this.claimSource(source, KnowledgeSourceStatus.UPDATING);
+
+    try {
+      const content = {
+        kind: 'binary' as const,
+        bytes: document.buffer,
+        fileName: document.name,
+        mimeType: document.mimetype,
+      };
+      const result = source.providerReference
+        ? await this.knowledgeEngine.replace({
+            organizationId,
+            providerReference: source.providerReference,
+            providerContainerReference: source.providerContainerReference,
+            content,
+          })
+        : await this.knowledgeEngine.ingest({ organizationId, content });
+      const readySource = await this.prisma.knowledgeSource.update({
+        where: { id: source.id },
+        data: {
+          name: document.name,
+          mimeType: document.mimetype,
+          sizeBytes: document.size,
+          status: KnowledgeSourceStatus.READY,
+          providerReference: result.providerReference,
+          providerContainerReference:
+            result.providerContainerReference ?? source.providerContainerReference,
+          version: { increment: 1 },
+          lastIndexedAt: new Date(),
+          errorMessage: null,
+        },
+      });
+
+      return this.toSourceResponse(readySource);
+    } catch (error) {
+      this.logger.error(
+        `Failed to replace knowledge source ${source.id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      await this.finishSourceMutationFailure(
+        source,
+        KnowledgeSourceStatus.UPDATING,
+        KnowledgeSourceStatus.FAILED,
+        FAILED_REPLACEMENT_MESSAGE,
+      );
+      throw new ServiceUnavailableException(FAILED_REPLACEMENT_MESSAGE);
+    }
+  }
+
+  async removeSource(userId: string, organizationId: string, sourceId: string): Promise<void> {
+    await this.requireRole(userId, organizationId, MANAGE_ROLES, 'remove knowledge sources');
+    const source = await this.findActiveSource(organizationId, sourceId);
+
+    if (source.providerReference && !this.knowledgeEngine.isConfigured()) {
+      throw new ServiceUnavailableException(
+        'The knowledge engine is not configured for this environment.',
+      );
+    }
+
+    await this.claimSource(source, KnowledgeSourceStatus.REMOVING);
+
+    if (source.providerReference) {
+      try {
+        await this.knowledgeEngine.remove({
+          organizationId,
+          providerReference: source.providerReference,
+          providerContainerReference: source.providerContainerReference,
+        });
+      } catch (error) {
+        this.logger.error(
+          `Failed to remove knowledge source ${source.id} from the knowledge engine`,
+          error instanceof Error ? error.stack : String(error),
+        );
+        await this.finishSourceMutationFailure(
+          source,
+          KnowledgeSourceStatus.REMOVING,
+          source.status,
+          FAILED_REMOVAL_MESSAGE,
+        );
+        throw new ServiceUnavailableException(FAILED_REMOVAL_MESSAGE);
+      }
+    }
+
+    try {
+      await this.prisma.knowledgeSource.update({
+        where: { id: source.id },
+        data: {
+          status: source.status,
+          archivedAt: new Date(),
+          errorMessage: null,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Provider removal succeeded but local archival failed for knowledge source ${source.id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new ServiceUnavailableException(FAILED_REMOVAL_MESSAGE);
     }
   }
 
@@ -219,6 +344,66 @@ export class CompanyBrainService {
     };
   }
 
+  private async findActiveSource(
+    organizationId: string,
+    sourceId: string,
+  ): Promise<PrismaKnowledgeSource> {
+    const source = await this.prisma.knowledgeSource.findFirst({
+      where: { id: sourceId, organizationId, archivedAt: null },
+    });
+
+    if (!source) {
+      throw new NotFoundException('Knowledge source not found.');
+    }
+
+    return source;
+  }
+
+  private async claimSource(
+    source: PrismaKnowledgeSource,
+    nextStatus: typeof KnowledgeSourceStatus.UPDATING | typeof KnowledgeSourceStatus.REMOVING,
+  ): Promise<void> {
+    if (
+      source.status === KnowledgeSourceStatus.PROCESSING ||
+      source.status === KnowledgeSourceStatus.UPDATING ||
+      source.status === KnowledgeSourceStatus.REMOVING
+    ) {
+      throw new ConflictException(SOURCE_BUSY_MESSAGE);
+    }
+
+    const result = await this.prisma.knowledgeSource.updateMany({
+      where: {
+        id: source.id,
+        organizationId: source.organizationId,
+        archivedAt: null,
+        status: source.status,
+        version: source.version,
+      },
+      data: { status: nextStatus, errorMessage: null },
+    });
+
+    if (result.count !== 1) {
+      throw new ConflictException(SOURCE_BUSY_MESSAGE);
+    }
+  }
+
+  private async finishSourceMutationFailure(
+    source: PrismaKnowledgeSource,
+    claimedStatus: typeof KnowledgeSourceStatus.UPDATING | typeof KnowledgeSourceStatus.REMOVING,
+    finalStatus: KnowledgeSourceStatus,
+    errorMessage: string,
+  ): Promise<void> {
+    await this.prisma.knowledgeSource.updateMany({
+      where: {
+        id: source.id,
+        organizationId: source.organizationId,
+        status: claimedStatus,
+        archivedAt: null,
+      },
+      data: { status: finalStatus, errorMessage },
+    });
+  }
+
   private async requireRole(
     userId: string,
     organizationId: string,
@@ -242,6 +427,8 @@ export class CompanyBrainService {
       mimeType: source.mimeType,
       sizeBytes: source.sizeBytes,
       status: source.status,
+      version: source.version,
+      lastIndexedAt: source.lastIndexedAt?.toISOString() ?? null,
       errorMessage: source.errorMessage,
       createdAt: source.createdAt.toISOString(),
       updatedAt: source.updatedAt.toISOString(),

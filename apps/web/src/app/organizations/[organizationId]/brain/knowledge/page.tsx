@@ -39,6 +39,39 @@ export default function KnowledgePage({ params }: PageProps) {
       }
     },
   });
+  const replaceMutation = useMutation({
+    mutationFn: ({ sourceId, file }: { sourceId: string; file: File }) =>
+      companyBrainApi.replaceSourceContent(organizationId, sourceId, file),
+    onSuccess: () => {
+      toast.success('Knowledge source replaced');
+    },
+    onError: (error) => {
+      toast.error(
+        error && typeof error === 'object' && 'message' in error
+          ? String(error.message)
+          : 'The knowledge source could not be replaced.',
+      );
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['knowledge-sources', organizationId] });
+    },
+  });
+  const removeMutation = useMutation({
+    mutationFn: (sourceId: string) => companyBrainApi.removeSource(organizationId, sourceId),
+    onSuccess: () => {
+      toast.success('Knowledge source removed');
+    },
+    onError: (error) => {
+      toast.error(
+        error && typeof error === 'object' && 'message' in error
+          ? String(error.message)
+          : 'The knowledge source could not be removed.',
+      );
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['knowledge-sources', organizationId] });
+    },
+  });
 
   if (statusQuery.isLoading || sourcesQuery.isLoading || roleQuery.isLoading) {
     return (
@@ -75,8 +108,18 @@ export default function KnowledgePage({ params }: PageProps) {
           canManage={canManage}
           isConfigured={isConfigured}
           isUploading={uploadMutation.isPending}
+          replacingSourceId={
+            replaceMutation.isPending ? (replaceMutation.variables?.sourceId ?? null) : null
+          }
+          removingSourceId={removeMutation.isPending ? (removeMutation.variables ?? null) : null}
           onUpload={async (file) => {
             await uploadMutation.mutateAsync(file);
+          }}
+          onReplace={async (sourceId, file) => {
+            await replaceMutation.mutateAsync({ sourceId, file });
+          }}
+          onRemove={async (sourceId) => {
+            await removeMutation.mutateAsync(sourceId);
           }}
         />
       )}

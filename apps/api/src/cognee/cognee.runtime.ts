@@ -3,7 +3,7 @@ import type { Cognee } from '@cognee/cognee-ts';
 export const COGNEE_RUNTIME_FACTORY = Symbol('COGNEE_RUNTIME_FACTORY');
 
 export interface CogneeRuntime {
-  client: Pick<Cognee, 'remember' | 'search' | 'warm'>;
+  client: Pick<Cognee, 'forget' | 'remember' | 'search' | 'update' | 'warm'>;
   shutdown: () => void;
 }
 

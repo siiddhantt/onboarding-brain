@@ -1,5 +1,5 @@
 export type KnowledgeSourceType = 'DOCUMENT';
-export type KnowledgeSourceStatus = 'PROCESSING' | 'READY' | 'FAILED';
+export type KnowledgeSourceStatus = 'PROCESSING' | 'READY' | 'FAILED' | 'UPDATING' | 'REMOVING';
 
 export interface KnowledgeSource {
   id: string;
@@ -10,6 +10,8 @@ export interface KnowledgeSource {
   mimeType: string | null;
   sizeBytes: number | null;
   status: KnowledgeSourceStatus;
+  version: number;
+  lastIndexedAt: string | null;
   errorMessage: string | null;
   createdAt: string;
   updatedAt: string;

@@ -52,7 +52,10 @@ describe('CogneeCloudService', () => {
       },
     });
 
-    expect(actual).toEqual({ providerReference: 'document-1' });
+    expect(actual).toEqual({
+      providerReference: 'document-1',
+      providerContainerReference: 'dataset-1',
+    });
     expect(fetcher).toHaveBeenCalledTimes(1);
     const [url, init] = fetcher.mock.calls[0];
     expect(url).toBe(`${apiUrl}/api/v1/remember`);
@@ -63,7 +66,9 @@ describe('CogneeCloudService', () => {
   });
 
   it('normalizes connector text into a text file for the same ingestion endpoint', async () => {
-    fetcher.mockResolvedValue(jsonResponse({ dataset_id: 'dataset-1', items: [] }));
+    fetcher.mockResolvedValue(
+      jsonResponse({ dataset_id: 'dataset-1', items: [{ id: 'document-1' }] }),
+    );
 
     await service.ingest({
       organizationId,
@@ -76,6 +81,72 @@ describe('CogneeCloudService', () => {
 
     const form = fetcher.mock.calls[0][1]?.body as FormData;
     expect((form.get('data') as File).name).toBe('Discord-people-ops.txt');
+  });
+
+  it('replaces a single item using its opaque provider references', async () => {
+    fetcher.mockResolvedValue(
+      jsonResponse({
+        'dataset-1': {
+          dataset_id: 'dataset-1',
+          data_ingestion_info: [{ data_id: 'document-2' }],
+        },
+      }),
+    );
+    const replacement = Buffer.from('Updated expense policy');
+
+    const actual = await service.replace({
+      organizationId,
+      providerReference: 'document-1',
+      providerContainerReference: 'dataset-1',
+      content: {
+        kind: 'binary',
+        bytes: replacement,
+        fileName: 'expense-policy-v2.md',
+        mimeType: 'text/markdown',
+      },
+    });
+
+    expect(actual).toEqual({
+      providerReference: 'document-2',
+      providerContainerReference: 'dataset-1',
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const [url, init] = fetcher.mock.calls[0];
+    expect(url).toBe(`${apiUrl}/api/v1/update?data_id=document-1&dataset_id=dataset-1`);
+    expect(init?.method).toBe('PATCH');
+    expect((init?.body as FormData).get('data')).toBeInstanceOf(File);
+  });
+
+  it('resolves the provider container for legacy sources before replacing them', async () => {
+    fetcher
+      .mockResolvedValueOnce(jsonResponse([{ id: 'dataset-1', name: datasetName }]))
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    await service.replace({
+      organizationId,
+      providerReference: 'document-1',
+      providerContainerReference: null,
+      content: { kind: 'text', name: 'Discord policy', text: 'Updated policy' },
+    });
+
+    expect(fetcher.mock.calls[0][0]).toBe(`${apiUrl}/api/v1/datasets/`);
+    expect(fetcher.mock.calls[1][0]).toBe(
+      `${apiUrl}/api/v1/update?data_id=document-1&dataset_id=dataset-1`,
+    );
+  });
+
+  it('removes a single item and its derived provider knowledge', async () => {
+    fetcher.mockResolvedValue(new Response(null, { status: 204 }));
+
+    await service.remove({
+      organizationId,
+      providerReference: 'document-1',
+      providerContainerReference: 'dataset-1',
+    });
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0][0]).toBe(`${apiUrl}/api/v1/datasets/dataset-1/data/document-1`);
+    expect(fetcher.mock.calls[0][1]?.method).toBe('DELETE');
   });
 
   it('retrieves evidence before returning a grounded answer', async () => {

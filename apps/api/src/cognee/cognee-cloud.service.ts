@@ -7,6 +7,8 @@ import {
   KnowledgeEngineCitation,
   KnowledgeIngestionRequest,
   KnowledgeIngestionResult,
+  KnowledgeItemRequest,
+  KnowledgeReplacementRequest,
 } from '../common/knowledge/knowledge-engine.interface';
 import { cogneeDatasetName } from './cognee-dataset';
 
@@ -25,6 +27,16 @@ interface CogneeCloudSearchEntry {
 interface CogneeCloudRememberResponse {
   dataset_id?: string;
   items?: Array<{ id?: string }>;
+}
+
+interface CogneeCloudDataset {
+  id?: string;
+  name?: string;
+}
+
+interface CogneeCloudUpdateRun {
+  dataset_id?: string;
+  data_ingestion_info?: Array<{ data_id?: string }> | null;
 }
 
 @Injectable()
@@ -56,10 +68,49 @@ export class CogneeCloudService implements KnowledgeEngine {
       method: 'POST',
       body: form,
     });
+    const providerReference = response.items?.[0]?.id;
+
+    if (!providerReference) {
+      throw new ServiceUnavailableException('Cognee Cloud did not return an item reference.');
+    }
 
     return {
-      providerReference: response.items?.[0]?.id ?? response.dataset_id ?? null,
+      providerReference,
+      providerContainerReference: response.dataset_id ?? null,
     };
+  }
+
+  async replace(request: KnowledgeReplacementRequest): Promise<KnowledgeIngestionResult> {
+    this.assertConfigured();
+
+    const containerReference = await this.resolveContainerReference(request);
+    const file = this.toFile(request.content);
+    const form = new FormData();
+    form.append('data', file.blob, file.name);
+
+    const query = new URLSearchParams({
+      data_id: request.providerReference,
+      dataset_id: containerReference,
+    });
+    const response = await this.request<Record<string, CogneeCloudUpdateRun>>(
+      `/api/v1/update?${query}`,
+      { method: 'PATCH', body: form },
+    );
+
+    return {
+      providerReference: this.updatedItemReference(response) ?? request.providerReference,
+      providerContainerReference: containerReference,
+    };
+  }
+
+  async remove(request: KnowledgeItemRequest): Promise<void> {
+    this.assertConfigured();
+
+    const containerReference = await this.resolveContainerReference(request);
+    await this.request<void>(
+      `/api/v1/datasets/${encodeURIComponent(containerReference)}/data/${encodeURIComponent(request.providerReference)}`,
+      { method: 'DELETE' },
+    );
   }
 
   async ask(organizationId: string, question: string): Promise<KnowledgeEngineAnswer> {
@@ -129,10 +180,41 @@ export class CogneeCloudService implements KnowledgeEngine {
     }
 
     try {
-      return (await response.json()) as T;
+      const body = await response.text();
+      return (body ? JSON.parse(body) : undefined) as T;
     } catch {
       throw new ServiceUnavailableException('Cognee Cloud returned an invalid response.');
     }
+  }
+
+  private async resolveContainerReference(request: KnowledgeItemRequest): Promise<string> {
+    if (request.providerContainerReference) {
+      return request.providerContainerReference;
+    }
+
+    const datasets = await this.request<CogneeCloudDataset[]>('/api/v1/datasets/', {
+      method: 'GET',
+    });
+    const datasetName = cogneeDatasetName(this.configService, request.organizationId);
+    const reference = datasets.find((dataset) => dataset.name === datasetName)?.id;
+
+    if (!reference) {
+      throw new ServiceUnavailableException('Cognee Cloud dataset could not be resolved.');
+    }
+
+    return reference;
+  }
+
+  private updatedItemReference(response: Record<string, CogneeCloudUpdateRun>): string | null {
+    for (const run of Object.values(response)) {
+      for (const item of run.data_ingestion_info ?? []) {
+        if (item.data_id) {
+          return item.data_id;
+        }
+      }
+    }
+
+    return null;
   }
 
   private toFile(content: KnowledgeContent): { blob: Blob; name: string } {
