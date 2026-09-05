@@ -1,38 +1,43 @@
+<div align="center">
+
+<img src="apps/web/public/images/brain-mark.svg" alt="Onboarding Brain's open-book mark" width="72">
+
 # Onboarding Brain
 
-An open-source employee onboarding Q&A app powered by
-[Cognee](https://www.cognee.ai/).
+**Answers from the knowledge your team chooses to share.**
 
-Employees ask questions against documents uploaded by their organization.
-Answers include retrieved sources, with a no-answer state when supporting
-evidence is missing. Owners and admins manage knowledge sources, departments,
-and contacts.
+[Run locally](#run-locally) ·
+[Try the brain](#try-the-brain) ·
+[Contribute](CONTRIBUTING.md)
 
-## Current scope
+[![Quality](https://img.shields.io/github/actions/workflow/status/siiddhantt/onboarding-brain/ci.yml?branch=main&style=flat-square&label=quality)](https://github.com/siiddhantt/onboarding-brain/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/siiddhantt/onboarding-brain?style=flat-square)](LICENSE)
 
-- Multi-tenant organizations, roles, invites, and optional custom website domains
-- Organization-isolated Cognee datasets
-- PDF, DOCX, TXT, Markdown, and HTML ingestion
-- Source replacement and removal, with version and indexing status
-- Curated source imports: Discord text channels and public threads, with preview and selection
-- Grounded Q&A with citations and a no-answer state
-- Department and contact configuration
-- Cognee Cloud and embedded SDK adapters behind one provider-neutral interface
+</div>
 
-This is a community prototype. Automatic syncing, Slack, expert handoff, and
-approval workflows are not implemented. Indexing runs synchronously, and
-conversations are kept only in the current page session.
+An open-source onboarding workspace powered by [Cognee](https://www.cognee.ai/).
+Members ask questions and find the right people. Owners and admins choose the
+knowledge the team can use.
 
-## Stack
+## One workspace, three places
 
-- Next.js and React
-- NestJS and Prisma
-- PostgreSQL and Redis
-- Turborepo with pnpm workspaces
+- **Ask** — questions in plain language, answers with sources, and a no-answer
+  state when supporting evidence is missing.
+- **Knowledge** — upload documents or select messages from Discord channels and
+  public threads. Preview before sharing, then replace or remove sources as needed.
+- **Directory** — departments and contacts drawn from the organization's members.
+
+Each organization has its own Cognee dataset. Imported content is shared with
+everyone in that organization; original channel permissions are not carried over.
+Imports are reviewed snapshots, not automatic mirrors of the source.
+
+This is a **community prototype**. Slack, automatic expert handoff, approval
+workflows, and company email-domain admission are not implemented. Indexing is
+synchronous, and conversations last only for the current page session.
 
 ## Run locally
 
-Requirements: Node 22.22.2 (see `.nvmrc`) or a supported newer version, pnpm, and Docker.
+You need [Node 22.22.2](.nvmrc) or a supported newer version, pnpm 10, and Docker.
 
 ```bash
 git clone https://github.com/siiddhantt/onboarding-brain.git
@@ -41,87 +46,63 @@ pnpm bootstrap
 pnpm dev
 ```
 
-| Service           | URL                            |
-| ----------------- | ------------------------------ |
-| Web app           | http://localhost:3000          |
-| API               | http://localhost:3001          |
-| API documentation | http://localhost:3001/api/docs |
-| Development inbox | http://localhost:8025          |
+Open the [app](http://localhost:3000). Verification emails and invitations arrive
+in the [local inbox](http://localhost:8025), not a real mailbox.
 
-The seed creates **Northstar Studio**, a fictional workspace with two accounts
-and contacts for People Operations and Finance. Both accounts use `Password123!`.
+Bootstrap creates **Northstar Studio**, a fictional workspace with two accounts:
 
-| Account                           | Role                      | What to try                                               |
-| --------------------------------- | ------------------------- | --------------------------------------------------------- |
-| `owner@example.com` — Maya Chen   | Owner; local global admin | Upload, replace, and remove sources; manage the directory |
-| `member@example.com` — Sam Rivera | Member                    | Ask questions, read sources, and find department contacts |
+| Account              | Role                |
+| -------------------- | ------------------- |
+| `owner@example.com`  | Maya Chen · Owner   |
+| `member@example.com` | Sam Rivera · Member |
 
-Seeding creates missing records without resetting existing passwords or
-configuration. It makes no Cognee calls. New signups and invitations use the
-development inbox above.
+Both use `Password123!`. These are **local demo accounts**; the owner is also a
+global admin. Re-running bootstrap preserves existing credentials and settings.
+Seeding makes no Cognee calls.
 
-## Connect Cognee Cloud
+## Try the brain
 
-Add the following to `apps/api/.env`:
+Ingestion and Q&A need Cognee configured. Follow the
+[Cognee setup](docs/integrations.md#cognee-knowledge-layer) for Cloud or the embedded
+SDK, then restart the API. Keep credentials in the ignored environment files.
+Ingestion and questions use the configured provider and may incur usage charges.
 
-```bash
-COGNEE_ENABLED=true
-COGNEE_PROVIDER=cloud
-COGNEE_CLOUD_API_URL=https://your-tenant.aws.cognee.ai
-COGNEE_CLOUD_API_KEY=your-api-key
-COGNEE_DATASET_PREFIX=organization
-```
+1. Sign in as the owner. Open **Northstar Studio → Company brain → Knowledge**
+   and upload the [sample expense policy](examples/northstar-expense-policy.md).
+2. Wait for **Ready**, then open **Ask**: “How do employees submit an expense
+   report, and who approves it?” Open the cited source to check the answer.
+3. Replace or remove the document through its menu. Sign in as the member to
+   try the read-only experience and department directory.
 
-Never commit the API key. Environment files are ignored by Git.
+For chat knowledge, follow the [Discord setup](docs/integrations.md#discord-curated-imports).
+Preview a channel or public thread, select useful messages, and confirm
+organization-wide sharing. Reviewing the selection updates the snapshot;
+removing it from the brain never deletes the original messages.
 
-Sign in as the owner and open **Northstar Studio → Company brain → Knowledge**.
-Upload [`examples/northstar-expense-policy.md`](examples/northstar-expense-policy.md),
-wait for **Ready**, then open **Ask** and try:
-“How do employees submit an expense report, and who approves it?”
+## Development
 
-Use the source's menu to replace it with an edited copy or remove it. Sign in as
-the member to check the read-only experience. Cognee ingestion and questions
-use your configured account; they are not mocked.
-
-The API derives the dataset from the authenticated organization. Browser
-clients cannot select another dataset. See
-[`docs/integrations.md`](docs/integrations.md) for the embedded SDK option and
-integration details.
-
-For connected sources, follow the [Discord setup](docs/integrations.md#discord-curated-imports).
-Owners preview a channel or public thread in **Knowledge → Import from a connected
-source**, select relevant items, and confirm organization-wide sharing. Review
-the selection later to replace it; removing a source never deletes the original
-messages. Unchanged imports do not trigger another indexing call.
-
-## Verify
+Next.js / React · NestJS / Prisma · PostgreSQL / Redis · pnpm / Turborepo
 
 ```bash
 pnpm verify
 pnpm build
 ```
 
-## Project structure
-
 ```text
-apps/api         NestJS API, Prisma schema, and knowledge integrations
-apps/web         Next.js application
-packages/shared  API contracts shared by both apps
-docs/adr         Architecture decisions
+apps/web/         Workspace UI
+apps/api/         API, database, and knowledge integrations
+packages/shared/  Shared API contracts
+docs/             Setup guides and architecture decisions
 ```
 
-## Contributing
+[Contributing](CONTRIBUTING.md) · [Integrations](docs/integrations.md) ·
+[Architecture decisions](docs/adr/README.md) · [Troubleshooting](docs/troubleshooting.md) ·
+[Local API docs](http://localhost:3001/api/docs)
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md). Please keep changes small,
-organization-scoped, and complete across the API and UI when both are affected.
+## Credits & license
 
-## Provenance
+Built on [digohq/app-starter](https://github.com/digohq/app-starter), which provides
+the authentication and multi-tenant foundation. This is an independent community
+project using Cognee as its knowledge layer, not an official Cognee product.
 
-Built from [digohq/app-starter](https://github.com/digohq/app-starter). The
-starter provides the authentication and multi-tenant SaaS foundation;
-Onboarding Brain remains a separate open-source project that uses Cognee as its
-knowledge layer.
-
-## License
-
-[MIT](LICENSE)
+Available under the [MIT License](LICENSE).
