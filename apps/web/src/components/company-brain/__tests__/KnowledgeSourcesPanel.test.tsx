@@ -41,6 +41,11 @@ describe('KnowledgeSourcesPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Upload document' }));
 
     await waitFor(() => expect(onUpload).toHaveBeenCalledWith(file));
+    await waitFor(() => {
+      expect(screen.getByLabelText('Onboarding document')).toHaveValue('');
+      expect(screen.getByText('Choose an onboarding document')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
   });
 
   it('requires a file before submitting', async () => {

@@ -91,8 +91,9 @@ export function KnowledgeSourcesPanel({
     event.preventDefault();
     setUploadError(null);
 
-    const file = inputRef.current?.files?.[0];
-    if (!file) {
+    const input = inputRef.current;
+    const file = input?.files?.[0];
+    if (!input || !file) {
       setUploadError('Choose a document first.');
       return;
     }
@@ -104,7 +105,7 @@ export function KnowledgeSourcesPanel({
 
     try {
       await onUpload(file);
-      event.currentTarget.reset();
+      input.value = '';
       setSelectedFileName(null);
     } catch (uploadError) {
       setUploadError(
