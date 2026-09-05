@@ -2,11 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { UserProfileMenu } from '@/components/public/UserProfileMenu';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { authStorage, AUTH_CHANGE_EVENT } from '@/lib/auth-storage';
 import {
   Header,
   HeaderBrand,
@@ -14,7 +12,7 @@ import {
   HeaderMobileMenuTrigger,
 } from '@/components/ui/navigation';
 import { Sheet, SheetTrigger, SheetContent } from '@/components/ui/Sheet';
-import { LOGO_PATH } from '@/lib/brand';
+import { BRAND_NAME, LOGO_PATH } from '@/lib/brand';
 import { Menu, Home, Building2, Settings } from 'lucide-react';
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 
@@ -29,7 +27,6 @@ export function UnifiedHeader({
   customLogoUrl?: string | null;
   logoHeight?: number | null;
 }) {
-  const pathname = usePathname();
   const { isAuthenticated, isLoaded } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -39,57 +36,52 @@ export function UnifiedHeader({
   return (
     <Header
       fixed={false}
-      className="sticky top-0 z-50 w-full h-16 border-border bg-card/80 backdrop-blur-md px-0"
+      className="sticky top-0 z-50 w-full h-16 border-border bg-card/80 backdrop-blur-md px-4 sm:px-6"
     >
-      <div className="flex items-center justify-between h-full w-full">
+      <div className="flex items-center justify-between gap-3 h-full w-full">
         <div className="flex items-center gap-6 min-w-0">
           <HeaderBrand
             as={Link}
             href="/"
             logoSrc={customLogoUrl || LOGO_PATH}
-            logoAlt={customLogoUrl ? 'Onboarding Brain' : ''}
-            brandName={customLogoUrl ? '' : 'Onboarding Brain'}
+            aria-label={`${BRAND_NAME} home`}
+            logoAlt=""
+            brandName={customLogoUrl ? '' : BRAND_NAME}
             logoHeight={logoHeight}
             isCustomLogo={!!customLogoUrl}
-            className={
-              customLogoUrl && !logoHeight
-                ? 'max-h-10 w-auto'
-                : !customLogoUrl
-                  ? '[&>span]:max-[420px]:hidden'
-                  : ''
-            }
+            className={customLogoUrl && !logoHeight ? 'max-h-10 w-auto' : undefined}
           />
         </div>
 
-        <HeaderActions className="gap-1 sm:gap-3">
+        <HeaderActions className="shrink-0 gap-1 sm:gap-3">
+          <ThemeToggle />
           {showAuthenticatedUI ? (
             <>
               <div className="hidden sm:block">
                 <NotificationCenter />
               </div>
-              <ThemeToggle />
               <UserProfileMenu />
             </>
-          ) : (
+          ) : isLoaded ? (
             <>
-              <Link href={getManagementUrl('/get-started')} className="hidden md:inline-flex">
-                <Button>Get Started</Button>
-              </Link>
-              <Link href={getManagementUrl('/login')} className="hidden md:inline-flex">
-                <Button variant="outline">Login</Button>
-              </Link>
+              <Button asChild size="sm" className="hidden rounded-full md:inline-flex">
+                <Link href={getManagementUrl('/get-started')}>Get started</Link>
+              </Button>
+              <Button asChild size="sm" variant="ghost" className="rounded-full">
+                <Link href={getManagementUrl('/login')}>Sign in</Link>
+              </Button>
             </>
-          )}
+          ) : null}
 
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <HeaderMobileMenuTrigger aria-label="Open navigation menu">
-                <Menu className="h-5 w-5" />
-              </HeaderMobileMenuTrigger>
-            </SheetTrigger>
-            <SheetContent side="right">
-              <div className="flex flex-col gap-3">
-                {showAuthenticatedUI ? (
+          {showAuthenticatedUI && (
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <HeaderMobileMenuTrigger aria-label="Open navigation menu">
+                  <Menu className="h-5 w-5" />
+                </HeaderMobileMenuTrigger>
+              </SheetTrigger>
+              <SheetContent side="right">
+                <div className="flex flex-col gap-3">
                   <nav className="flex flex-col gap-2" aria-label="Main navigation">
                     <Link
                       href={getManagementUrl('/dashboard')}
@@ -116,27 +108,10 @@ export function UnifiedHeader({
                       <span>Settings</span>
                     </Link>
                   </nav>
-                ) : (
-                  <>
-                    <Link
-                      href={getManagementUrl('/get-started')}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center justify-center px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity"
-                    >
-                      Get Started
-                    </Link>
-                    <Link
-                      href={getManagementUrl('/login')}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center justify-center px-4 py-2.5 rounded-xl border border-input bg-background font-medium hover:bg-muted transition-colors"
-                    >
-                      Login
-                    </Link>
-                  </>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
+                </div>
+              </SheetContent>
+            </Sheet>
+          )}
         </HeaderActions>
       </div>
     </Header>

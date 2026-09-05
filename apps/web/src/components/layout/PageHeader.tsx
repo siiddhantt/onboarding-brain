@@ -17,7 +17,7 @@ export function PageHeader({ title, description, children, className }: PageHead
       )}
     >
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+        <h1 className="font-display text-2xl font-medium tracking-tight text-foreground flex items-center gap-3 sm:text-3xl">
           {title}
         </h1>
         {description && <div className="text-muted-foreground">{description}</div>}

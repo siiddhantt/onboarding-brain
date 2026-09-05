@@ -449,6 +449,11 @@ Organizations can serve their public page from a domain they own. This is an
 integration with **your tenant's** DNS provider rather than a service you
 configure once.
 
+This optional starter feature is visible to organization owners and admins only.
+It is **not** the PRD's approved company **email** domain policy: signing up
+still requires email verification and joining an existing organization requires
+an invitation. Email-domain admission rules are not implemented yet.
+
 **How it works:**
 
 1. An admin adds a domain in organization settings. The app stores it as

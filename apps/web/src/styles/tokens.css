@@ -39,6 +39,7 @@
 
   /* Typography – families */
   --font-primary: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Lexend', var(--font-primary);
   --font-mono: 'SF Mono', 'Monaco', 'Consolas', monospace;
 
   /* Typography – scale (size, line-height, weight) */

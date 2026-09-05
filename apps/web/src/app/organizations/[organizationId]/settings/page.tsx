@@ -40,10 +40,13 @@ export default function OrganizationSettingsPage({ params }: PageProps) {
     queryFn: () => organizationsApi.getOrganization(organizationId),
   });
 
-  const { data: roleInfo } = useQuery({
+  const { data: roleInfo, isLoading: isRoleLoading } = useQuery({
     queryKey: ['organization-role', organizationId],
     queryFn: () => organizationsApi.getUserRoleInOrganization(organizationId),
   });
+
+  const role = roleInfo?.role ?? 'MEMBER';
+  const canManage = role === 'OWNER' || role === 'ADMIN';
 
   const { data: members, refetch: refetchMembers } = useQuery({
     queryKey: ['organization-members', organizationId],
@@ -53,9 +56,10 @@ export default function OrganizationSettingsPage({ params }: PageProps) {
   const { data: domains, refetch: refetchDomains } = useQuery({
     queryKey: ['domain-mappings', organizationId],
     queryFn: () => domainMappingsApi.list(organizationId),
+    enabled: canManage,
   });
 
-  if (isLoading) {
+  if (isLoading || isRoleLoading) {
     return (
       <PageContainer>
         <div className="flex justify-center py-24">
@@ -75,14 +79,12 @@ export default function OrganizationSettingsPage({ params }: PageProps) {
     );
   }
 
-  const role = roleInfo?.role ?? 'MEMBER';
-  const canManage = role === 'OWNER' || role === 'ADMIN';
   const requestedSection = searchParams.get('section');
-  const initialSection = ['general', 'members', 'departments', 'domains'].includes(
-    requestedSection ?? '',
-  )
-    ? requestedSection!
-    : 'general';
+  const initialSection =
+    ['general', 'members', 'departments', 'domains'].includes(requestedSection ?? '') &&
+    (requestedSection !== 'domains' || canManage)
+      ? requestedSection!
+      : 'general';
 
   return (
     <PageContainer>
@@ -94,7 +96,7 @@ export default function OrganizationSettingsPage({ params }: PageProps) {
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="members">Members</TabsTrigger>
             <TabsTrigger value="departments">Departments</TabsTrigger>
-            <TabsTrigger value="domains">Domains</TabsTrigger>
+            {canManage && <TabsTrigger value="domains">Custom domain</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="general" className="space-y-6 pt-6">
@@ -165,29 +167,32 @@ export default function OrganizationSettingsPage({ params }: PageProps) {
             />
           </TabsContent>
 
-          <TabsContent value="domains" className="space-y-6 pt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Add a domain</CardTitle>
-                <CardDescription>
-                  Point a domain you own at this organization. You will be given a DNS TXT record to
-                  verify ownership.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DomainMappingForm
-                  organizationId={organizationId}
-                  onSuccess={() => refetchDomains()}
-                />
-              </CardContent>
-            </Card>
+          {canManage && (
+            <TabsContent value="domains" className="space-y-6 pt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Custom website domain</CardTitle>
+                  <CardDescription>
+                    Optional: serve your organization’s public page at a domain you own. This needs
+                    DNS and hosting setup; it does not control which email addresses can join your
+                    organization.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <DomainMappingForm
+                    organizationId={organizationId}
+                    onSuccess={() => refetchDomains()}
+                  />
+                </CardContent>
+              </Card>
 
-            <DomainMappingList
-              organizationId={organizationId}
-              mappings={domains?.domainMappings ?? []}
-              onRefresh={() => refetchDomains()}
-            />
-          </TabsContent>
+              <DomainMappingList
+                organizationId={organizationId}
+                mappings={domains?.domainMappings ?? []}
+                onRefresh={() => refetchDomains()}
+              />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 

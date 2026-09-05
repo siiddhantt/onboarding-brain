@@ -10,7 +10,7 @@ and contacts.
 
 ## Current scope
 
-- Multi-tenant organizations, roles, invites, and domain verification
+- Multi-tenant organizations, roles, invites, and optional custom website domains
 - Organization-isolated Cognee datasets
 - PDF, DOCX, TXT, Markdown, and HTML ingestion
 - Source replacement and removal, with version and indexing status
