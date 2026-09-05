@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { OrgRole } from '@prisma/client';
+import { OrgRole, Prisma } from '@prisma/client';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DepartmentsService } from './departments.service';
@@ -166,6 +166,27 @@ describe('DepartmentsService', () => {
     });
     expect(prisma.departmentContact.delete).toHaveBeenCalledWith({ where: { id: 'contact-1' } });
   });
+
+  it.each([
+    ['P2002', ConflictException],
+    ['P2003', NotFoundException],
+  ])(
+    'handles a concurrent assignment change (%s) without a server error',
+    async (code, exception) => {
+      prisma.departmentContact.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Concurrent change', {
+          code,
+          clientVersion: '7.2.0',
+        }),
+      );
+
+      await expect(
+        service.assignContact(userId, organizationId, departmentId, {
+          organizationMemberId: 'member-1',
+        }),
+      ).rejects.toThrow(exception);
+    },
+  );
 
   it('archives a scoped department instead of deleting it', async () => {
     await service.archive(userId, organizationId, departmentId);

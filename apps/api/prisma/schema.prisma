@@ -173,6 +173,7 @@ model OrganizationMember {
   departmentContacts DepartmentContact[]
 
   @@unique([userId, organizationId])
+  @@unique([id, organizationId])
   @@index([userId])
   @@index([organizationId])
   @@index([userId, role, organizationId])
@@ -412,6 +413,11 @@ model KnowledgeSource {
   status                     KnowledgeSourceStatus @default(PROCESSING)
   providerReference          String?               @map("provider_reference")
   providerContainerReference String?               @map("provider_container_reference")
+  connectorId                String?               @map("connector_id")
+  externalId                 String?               @map("external_id")
+  sourceUrl                  String?               @map("source_url")
+  contentHash                String?               @map("content_hash")
+  selection                  Json?
   version                    Int                   @default(1)
   lastIndexedAt              DateTime?             @map("last_indexed_at") @db.Timestamptz(6)
   errorMessage               String?               @map("error_message")
@@ -425,6 +431,7 @@ model KnowledgeSource {
   @@index([organizationId, archivedAt, createdAt])
   @@index([organizationId, status])
   @@index([providerReference])
+  @@unique([organizationId, connectorId, externalId])
   @@map("knowledge_sources")
 }
 
@@ -442,6 +449,7 @@ model Department {
   contacts     DepartmentContact[]
 
   @@unique([organizationId, slug])
+  @@unique([id, organizationId])
   @@index([organizationId, archivedAt, name])
   @@map("departments")
 }
@@ -454,8 +462,8 @@ model DepartmentContact {
   createdAt            DateTime @default(now()) @db.Timestamptz(6)
 
   organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  department         Department         @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  organizationMember OrganizationMember @relation(fields: [organizationMemberId], references: [id], onDelete: Cascade)
+  department         Department         @relation(fields: [departmentId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  organizationMember OrganizationMember @relation(fields: [organizationMemberId, organizationId], references: [id, organizationId], onDelete: Cascade)
 
   @@unique([departmentId, organizationMemberId])
   @@index([organizationId, departmentId])

@@ -3,7 +3,15 @@
 import { useRef, useState, type FormEvent } from 'react';
 import type { KnowledgeSource, KnowledgeSourceStatus } from '@app-starter/shared';
 import { KNOWLEDGE_DOCUMENT_MIME_TYPES, MAX_KNOWLEDGE_DOCUMENT_BYTES } from '@app-starter/shared';
-import { FileText, Loader2, MoreHorizontal, RefreshCw, Trash2, Upload } from 'lucide-react';
+import {
+  ExternalLink,
+  FileText,
+  Loader2,
+  MoreHorizontal,
+  RefreshCw,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
+import { IconTile } from '@/components/ui/icon-tile';
 import { Label } from '@/components/ui/label';
 
 const STATUS_LABELS: Record<KnowledgeSourceStatus, string> = {
@@ -63,6 +71,7 @@ interface KnowledgeSourcesPanelProps {
   onUpload: (file: File) => Promise<void>;
   onReplace: (sourceId: string, file: File) => Promise<void>;
   onRemove: (sourceId: string) => Promise<void>;
+  onReview?: (source: KnowledgeSource) => void;
 }
 
 export function KnowledgeSourcesPanel({
@@ -75,6 +84,7 @@ export function KnowledgeSourcesPanel({
   onUpload,
   onReplace,
   onRemove,
+  onReview,
 }: KnowledgeSourcesPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const replacementInputs = useRef(new Map<string, HTMLInputElement>());
@@ -180,14 +190,14 @@ export function KnowledgeSourcesPanel({
                 >
                   <span className="sr-only">Onboarding document</span>
                   <Upload className="mb-2 h-5 w-5 text-muted-foreground" aria-hidden="true" />
-                  <span className="text-sm font-medium">
+                  <span className="max-w-full text-sm font-medium [overflow-wrap:anywhere]">
                     {selectedFileName ?? 'Choose an onboarding document'}
                   </span>
                   <span className="mt-1 text-xs font-normal text-muted-foreground">
                     PDF, DOCX, TXT, Markdown, or HTML · up to 10 MB
                   </span>
                 </Label>
-                <Input
+                <input
                   ref={inputRef}
                   id="knowledge-document"
                   name="file"
@@ -250,13 +260,26 @@ export function KnowledgeSourcesPanel({
             ) : (
               <div className="max-h-[32rem] divide-y overflow-y-auto rounded-lg border">
                 {sources.map((source) => (
-                  <div key={source.id} className="flex items-start justify-between gap-4 p-4">
-                    <div className="flex min-w-0 gap-3">
-                      <div className="rounded-md bg-muted p-2 text-muted-foreground">
-                        <FileText className="h-4 w-4" />
-                      </div>
+                  <div
+                    key={source.id}
+                    className="flex min-w-0 flex-wrap items-start justify-between gap-3 p-3 sm:flex-nowrap sm:p-4"
+                  >
+                    <div className="flex min-w-0 flex-1 gap-3">
+                      <IconTile icon={FileText} />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{source.name}</p>
+                        {source.origin && (
+                          <a
+                            href={source.origin.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:underline"
+                          >
+                            {source.origin.itemCount} curated{' '}
+                            {source.origin.itemCount === 1 ? 'item' : 'items'}
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           Version {source.version} · {formatBytes(source.sizeBytes)} ·{' '}
                           {source.lastIndexedAt
@@ -268,7 +291,7 @@ export function KnowledgeSourcesPanel({
                             <summary className="cursor-pointer font-medium text-destructive">
                               Indexing details
                             </summary>
-                            <p className="mt-1 max-w-xl leading-5 text-muted-foreground">
+                            <p className="mt-1 max-w-xl leading-5 text-muted-foreground [overflow-wrap:anywhere]">
                               {source.errorMessage}
                             </p>
                           </details>
@@ -289,24 +312,26 @@ export function KnowledgeSourcesPanel({
                       </Badge>
                       {canManage && (
                         <>
-                          <Input
-                            ref={(element) => {
-                              if (element) {
-                                replacementInputs.current.set(source.id, element);
-                              } else {
-                                replacementInputs.current.delete(source.id);
-                              }
-                            }}
-                            type="file"
-                            accept={KNOWLEDGE_DOCUMENT_MIME_TYPES.join(',')}
-                            aria-label={`Replacement document for ${source.name}`}
-                            className="sr-only"
-                            disabled={!isConfigured || BUSY_STATUSES.has(source.status)}
-                            onChange={(event) => {
-                              handleReplacementSelected(source, event.target.files?.[0]);
-                              event.target.value = '';
-                            }}
-                          />
+                          {!source.origin && (
+                            <input
+                              ref={(element) => {
+                                if (element) {
+                                  replacementInputs.current.set(source.id, element);
+                                } else {
+                                  replacementInputs.current.delete(source.id);
+                                }
+                              }}
+                              type="file"
+                              accept={KNOWLEDGE_DOCUMENT_MIME_TYPES.join(',')}
+                              aria-label={`Replacement document for ${source.name}`}
+                              className="sr-only"
+                              disabled={!isConfigured || BUSY_STATUSES.has(source.status)}
+                              onChange={(event) => {
+                                handleReplacementSelected(source, event.target.files?.[0]);
+                                event.target.value = '';
+                              }}
+                            />
+                          )}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
@@ -330,10 +355,14 @@ export function KnowledgeSourcesPanel({
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
                                 disabled={!isConfigured}
-                                onSelect={() => replacementInputs.current.get(source.id)?.click()}
+                                onSelect={() =>
+                                  source.origin
+                                    ? onReview?.(source)
+                                    : replacementInputs.current.get(source.id)?.click()
+                                }
                               >
                                 <RefreshCw className="mr-2" />
-                                Replace document
+                                {source.origin ? 'Review selection' : 'Replace document'}
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"
@@ -384,7 +413,7 @@ export function KnowledgeSourcesPanel({
             <AlertDialogTitle>Remove this knowledge source?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingRemoval
-                ? `${pendingRemoval.name} and its derived knowledge will be removed from future answers. This cannot be undone.`
+                ? `${pendingRemoval.name} and its derived knowledge will be removed from future answers. Original content in connected services is not deleted.`
                 : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>

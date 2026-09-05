@@ -1,4 +1,4 @@
-export type KnowledgeSourceType = 'DOCUMENT';
+export type KnowledgeSourceType = 'DOCUMENT' | 'EXTERNAL';
 export type KnowledgeSourceStatus = 'PROCESSING' | 'READY' | 'FAILED' | 'UPDATING' | 'REMOVING';
 
 export interface KnowledgeSource {
@@ -15,6 +15,12 @@ export interface KnowledgeSource {
   errorMessage: string | null;
   createdAt: string;
   updatedAt: string;
+  origin?: {
+    connectorId: string;
+    externalId: string;
+    url: string;
+    itemCount: number;
+  };
 }
 
 export interface KnowledgeSourceListResponse {
@@ -35,6 +41,8 @@ export interface CompanyBrainCitation {
   sourceName: string;
   excerpt: string | null;
   score: number | null;
+  sourceUrl?: string;
+  sourceLinks?: { title: string; url: string }[];
 }
 
 export interface CompanyBrainAnswer {

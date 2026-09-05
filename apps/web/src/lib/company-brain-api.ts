@@ -4,10 +4,32 @@ import type {
   CompanyBrainStatusResponse,
   KnowledgeSource,
   KnowledgeSourceListResponse,
+  SourceConnectorDescriptor,
+  SourcePreview,
+  PreviewSourceRequest,
+  ImportSourceRequest,
 } from '@app-starter/shared';
 import { apiClient } from './api-client';
 
 export class CompanyBrainApi {
+  async listConnectors(organizationId: string): Promise<SourceConnectorDescriptor[]> {
+    return apiClient.get(`/api/organizations/${organizationId}/brain/imports/connectors`);
+  }
+
+  async previewSource(
+    organizationId: string,
+    request: PreviewSourceRequest,
+  ): Promise<SourcePreview> {
+    return apiClient.post(`/api/organizations/${organizationId}/brain/imports/preview`, request);
+  }
+
+  async importSource(
+    organizationId: string,
+    request: ImportSourceRequest,
+  ): Promise<KnowledgeSource> {
+    return apiClient.post(`/api/organizations/${organizationId}/brain/imports`, request);
+  }
+
   async getStatus(organizationId: string): Promise<CompanyBrainStatusResponse> {
     return apiClient.get<CompanyBrainStatusResponse>(
       `/api/organizations/${organizationId}/brain/status`,

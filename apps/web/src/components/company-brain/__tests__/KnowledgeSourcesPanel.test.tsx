@@ -95,7 +95,9 @@ describe('KnowledgeSourcesPanel', () => {
 
     await user.click(screen.getByLabelText(`Actions for ${source.name}`));
     await user.click(screen.getByRole('menuitem', { name: 'Remove from brain' }));
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('This cannot be undone.');
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(
+      'Original content in connected services is not deleted.',
+    );
     await user.click(screen.getByRole('button', { name: 'Remove source' }));
 
     await waitFor(() => expect(onRemove).toHaveBeenCalledWith(source.id));

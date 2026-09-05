@@ -15,7 +15,7 @@ export default async function CompanyBrainLayout({ children, params }: LayoutPro
 
   return (
     <PageContainer variant="dashboard" className="pb-12 pt-6 sm:pt-8">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto w-full min-w-0 max-w-5xl">
         <PageHeader
           title="Company brain"
           description="Reliable answers from your organization’s knowledge."

@@ -6,7 +6,7 @@ import { AuthService } from '../auth/auth.service';
 // EmailService removed
 import { NotificationsService } from '../notifications/services/notifications.service';
 import { OrgRole } from '@app-starter/shared';
-import { InviteStatus, OrgRole as PrismaOrganizationRole } from '@prisma/client';
+import { InviteStatus, OrgRole as PrismaOrganizationRole, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 import {
   InviteValidationException,
@@ -19,6 +19,7 @@ import {
   EmailVerificationNotFoundException,
   EmailVerificationExpiredException,
   EmailVerificationAlreadyUsedException,
+  InviteAccessDeniedException,
 } from './exceptions/invites.exceptions';
 
 @Injectable()
@@ -89,11 +90,37 @@ export class OrganizationInvitesService {
   }
 
   /**
-   * Check if user has permission to manage invitations (OWNER, ADMIN, or MEMBER)
+   * Invitation management matches the organization settings permissions.
    */
   private async canManageInvites(organizationId: string, userId: string): Promise<boolean> {
     const role = await this.organizationsService.getUserRoleInOrganization(userId, organizationId);
-    return role === OrgRole.OWNER || role === OrgRole.ADMIN || role === OrgRole.MEMBER;
+    return role === OrgRole.OWNER || role === OrgRole.ADMIN;
+  }
+
+  private assertInviteEmail(invitedEmail: string | null, recipientEmail: string): void {
+    if (invitedEmail && invitedEmail.trim().toLowerCase() !== recipientEmail.trim().toLowerCase()) {
+      throw new InviteAccessDeniedException('This invitation is addressed to a different email');
+    }
+  }
+
+  private async claimInvite(
+    tx: Prisma.TransactionClient,
+    inviteId: string,
+    organizationId: string,
+  ): Promise<void> {
+    // Claim and membership creation share a transaction, so a single-use link cannot admit twice.
+    const claimed = await tx.organizationInvite.updateMany({
+      where: {
+        id: inviteId,
+        organizationId,
+        status: InviteStatus.PENDING,
+        expiresAt: { gt: new Date() },
+      },
+      data: { status: InviteStatus.ACCEPTED },
+    });
+    if (claimed.count !== 1) {
+      throw new InviteValidationException('This invitation is no longer available');
+    }
   }
 
   /**
@@ -228,7 +255,7 @@ export class OrganizationInvitesService {
       throw new InviteValidationException('Organization not found');
     }
 
-    const trimmedEmail = email?.trim();
+    const trimmedEmail = email?.trim().toLowerCase();
     if (trimmedEmail) {
       const dup = await this.prisma.organizationInvite.findFirst({
         where: {
@@ -456,7 +483,7 @@ export class OrganizationInvitesService {
     }
 
     const invite = await this.prisma.organizationInvite.findUnique({
-      where: { id: inviteId },
+      where: { id: inviteId, organizationId },
       include: {
         organization: { select: { id: true, name: true } },
       },
@@ -540,15 +567,11 @@ export class OrganizationInvitesService {
 
     // Verify invitation exists and belongs to organization
     const invite = await this.prisma.organizationInvite.findUnique({
-      where: { id: inviteId },
+      where: { id: inviteId, organizationId },
     });
 
-    if (!invite) {
+    if (!invite || invite.organizationId !== organizationId) {
       throw new InviteNotFoundException(inviteId);
-    }
-
-    if (invite.organizationId !== organizationId) {
-      throw new InviteValidationException('Invitation does not belong to this organization');
     }
 
     // Check if already cancelled or accepted (for single-use)
@@ -577,6 +600,15 @@ export class OrganizationInvitesService {
   async acceptInvite(token: string, userId: string) {
     // Validate invitation
     const invite = await this.validateInvite(token);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, emailVerifiedAt: true },
+    });
+    if (!user?.emailVerifiedAt) {
+      throw new InviteAccessDeniedException('Verify your email before accepting an invitation');
+    }
+    this.assertInviteEmail(invite.email, user.email);
 
     // Check if can be accepted
     const canAccept = await this.canAcceptInvite(invite);
@@ -626,26 +658,17 @@ export class OrganizationInvitesService {
       },
     });
 
-    let message = 'You have been added to the organization';
-    if (existingMembership) {
-      message = 'You are already a member of this organization';
-    } else {
-      // Add user to organization with role from the invitation
-      await this.prisma.organizationMember.create({
-        data: {
+    const membership = await this.prisma.$transaction(async (tx) => {
+      await this.claimInvite(tx, invite.id, invite.organizationId);
+      return tx.organizationMember.upsert({
+        where: { userId_organizationId: { userId, organizationId: invite.organizationId } },
+        create: {
           userId,
           organizationId: invite.organizationId,
           role: invite.invitedRole,
         },
+        update: {},
       });
-    }
-
-    // Update invitation status to ACCEPTED (single-use behavior)
-    await this.prisma.organizationInvite.update({
-      where: { id: invite.id },
-      data: {
-        status: InviteStatus.ACCEPTED,
-      },
     });
 
     return {
@@ -655,8 +678,10 @@ export class OrganizationInvitesService {
         slug: organization.slug,
         description: organization.description,
       },
-      role: invite.invitedRole as OrgRole,
-      message,
+      role: membership.role as OrgRole,
+      message: existingMembership
+        ? 'You are already a member of this organization'
+        : 'You have been added to the organization',
     };
   }
 
@@ -668,12 +693,14 @@ export class OrganizationInvitesService {
     data: { name: string; email: string; confirmEmail: string },
   ) {
     // Validate email match
-    if (data.email !== data.confirmEmail) {
+    const email = data.email.trim().toLowerCase();
+    if (email !== data.confirmEmail.trim().toLowerCase()) {
       throw new InviteValidationException('Email addresses do not match');
     }
 
     // Validate invitation
     const invite = await this.validateInvite(token);
+    this.assertInviteEmail(invite.email, email);
 
     // Check if can be accepted
     const canAccept = await this.canAcceptInvite(invite);
@@ -721,7 +748,7 @@ export class OrganizationInvitesService {
       data: {
         inviteId: invite.id,
         token: verifyToken,
-        email: data.email,
+        email,
         name: data.name,
         expiresAt,
       },
@@ -734,7 +761,7 @@ export class OrganizationInvitesService {
     try {
       await this.notificationsService.sendNotification(
         'organization-invite-verification',
-        { type: 'email', email: data.email },
+        { type: 'email', email },
         {
           firstName: data.name,
           verificationUrl,
@@ -748,7 +775,7 @@ export class OrganizationInvitesService {
 
     return {
       message: `Verification email sent to ${data.email}`,
-      email: data.email,
+      email,
     };
   }
 
@@ -772,6 +799,7 @@ export class OrganizationInvitesService {
     if (verification.inviteId !== invite.id) {
       throw new EmailVerificationNotFoundException();
     }
+    this.assertInviteEmail(invite.email, verification.email);
 
     // Check if verification is expired
     if (this.isVerificationExpired(verification.expiresAt)) {
@@ -829,6 +857,14 @@ export class OrganizationInvitesService {
 
     // Use transaction for atomicity
     const result = await this.prisma.$transaction(async (tx) => {
+      await this.claimInvite(tx, invite.id, invite.organizationId);
+      const claimedVerification = await tx.inviteEmailVerification.updateMany({
+        where: { id: verification.id, usedAt: null, expiresAt: { gt: new Date() } },
+        data: { usedAt: new Date() },
+      });
+      if (claimedVerification.count !== 1) {
+        throw new EmailVerificationAlreadyUsedException();
+      }
       // Use upsert to handle race conditions - this won't abort the transaction
       // Check if user exists first to determine if it's a new user
       const existingUser = await tx.user.findUnique({
@@ -862,33 +898,19 @@ export class OrganizationInvitesService {
         },
       });
 
-      if (!existingMembership) {
-        await tx.organizationMember.create({
-          data: {
-            userId: user.id,
-            organizationId: invite.organizationId,
-            role: invite.invitedRole,
-          },
-        });
-      }
-
-      // Mark verification as used
-      await tx.inviteEmailVerification.update({
-        where: { id: verification.id },
-        data: {
-          usedAt: new Date(),
+      const membership = await tx.organizationMember.upsert({
+        where: {
+          userId_organizationId: { userId: user.id, organizationId: invite.organizationId },
         },
+        create: {
+          userId: user.id,
+          organizationId: invite.organizationId,
+          role: invite.invitedRole,
+        },
+        update: {},
       });
 
-      // Update invitation status to ACCEPTED
-      await tx.organizationInvite.update({
-        where: { id: invite.id },
-        data: {
-          status: InviteStatus.ACCEPTED,
-        },
-      });
-
-      return { user, isNewUser, existingMembership };
+      return { user, isNewUser, existingMembership, membership };
     });
 
     // Generate JWT tokens for automatic login
@@ -914,7 +936,7 @@ export class OrganizationInvitesService {
         name: organization.name,
         slug: organization.slug,
       },
-      role: invite.invitedRole as OrgRole,
+      role: result.membership.role as OrgRole,
       authToken: tokens.accessToken,
       message,
       isNewUser: result.isNewUser,

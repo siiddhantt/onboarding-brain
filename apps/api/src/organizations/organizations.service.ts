@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { OrgRole } from '@app-starter/shared';
-import { OrgRole as PrismaOrganizationRole } from '@prisma/client';
+import { OrgRole as PrismaOrganizationRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { OrganizationResponseDto } from './dto/organization-response.dto';
@@ -241,8 +241,23 @@ export class OrganizationsService {
     targetUserId: string,
     requesterUserId: string,
   ) {
-    // Check if requester is a member of the organization
-    const requesterRole = await this.getUserRoleInOrganization(requesterUserId, organizationId);
+    return this.prisma.$transaction((tx) =>
+      this.removeMembership(tx, organizationId, targetUserId, requesterUserId),
+    );
+  }
+
+  private async removeMembership(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    targetUserId: string,
+    requesterUserId: string,
+  ) {
+    // Serialize membership removals per organization, including the last-owner check.
+    await tx.$queryRaw`SELECT id FROM organizations WHERE id = ${organizationId} FOR UPDATE`;
+    const requester = await tx.organizationMember.findUnique({
+      where: { userId_organizationId: { userId: requesterUserId, organizationId } },
+    });
+    const requesterRole = requester?.role;
     if (!requesterRole) {
       throw new ForbiddenException('You do not have access to this organization');
     }
@@ -252,17 +267,8 @@ export class OrganizationsService {
       throw new ForbiddenException('Only owners and admins can remove users from the organization');
     }
 
-    // Verify organization exists
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-    });
-
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
-    }
-
     // Check if target user is a member
-    const targetOrganizationUser = await this.prisma.organizationMember.findUnique({
+    const targetOrganizationUser = await tx.organizationMember.findUnique({
       where: {
         userId_organizationId: {
           userId: targetUserId,
@@ -275,28 +281,11 @@ export class OrganizationsService {
       throw new NotFoundException('User is not a member of this organization');
     }
 
-    // Prevent removing yourself if you're the only OWNER
-    if (
-      targetUserId === requesterUserId &&
-      targetOrganizationUser.role === PrismaOrganizationRole.OWNER
-    ) {
-      const ownerCount = await this.prisma.organizationMember.count({
-        where: {
-          organizationId,
-          role: PrismaOrganizationRole.OWNER,
-        },
-      });
-
-      if (ownerCount === 1) {
-        throw new ForbiddenException(
-          'Cannot remove yourself as the only owner of the organization',
-        );
-      }
-    }
-
-    // Prevent removing the last OWNER (even if not yourself)
     if (targetOrganizationUser.role === PrismaOrganizationRole.OWNER) {
-      const ownerCount = await this.prisma.organizationMember.count({
+      if (requesterRole !== OrgRole.OWNER) {
+        throw new ForbiddenException('Only owners can remove another owner');
+      }
+      const ownerCount = await tx.organizationMember.count({
         where: {
           organizationId,
           role: PrismaOrganizationRole.OWNER,
@@ -309,7 +298,7 @@ export class OrganizationsService {
     }
 
     // Remove the user from the organization
-    await this.prisma.organizationMember.delete({
+    await tx.organizationMember.delete({
       where: {
         userId_organizationId: {
           userId: targetUserId,
@@ -580,21 +569,22 @@ export class OrganizationsService {
   }
 
   /**
-   * Get a organization by ID — requires authentication but not organization membership
+   * Get private organization details for a current member.
    */
   async getOrganizationById(
     organizationId: string,
     userId: string,
   ): Promise<OrganizationResponseDto> {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
+    const membership = await this.prisma.organizationMember.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      include: { organization: true },
     });
 
-    if (!organization) {
+    if (!membership) {
       throw new NotFoundException('Organization not found');
     }
 
-    const userRole = await this.getUserRoleInOrganization(userId, organizationId);
+    const { organization, role } = membership;
 
     return {
       id: organization.id,
@@ -608,7 +598,7 @@ export class OrganizationsService {
       emailSenderName: (organization as any).emailSenderName ?? null,
       createdAt: organization.createdAt,
       updatedAt: organization.updatedAt,
-      userRole: (userRole ?? OrgRole.MEMBER) as OrgRole,
+      userRole: role as OrgRole,
     };
   }
 

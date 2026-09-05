@@ -2,12 +2,11 @@
 
 import { useState } from 'react';
 import type { CompanyBrainCitation } from '@app-starter/shared';
-import { ChevronDown, FileText } from 'lucide-react';
+import { ChevronDown, ExternalLink, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface AnswerSourcesDisclosureProps {
   citations: CompanyBrainCitation[];
-  verb?: 'used' | 'checked';
 }
 
 function SourceExcerpt({ citation }: { citation: CompanyBrainCitation }) {
@@ -39,15 +38,12 @@ function SourceExcerpt({ citation }: { citation: CompanyBrainCitation }) {
   );
 }
 
-export function AnswerSourcesDisclosure({
-  citations,
-  verb = 'used',
-}: AnswerSourcesDisclosureProps) {
+export function AnswerSourcesDisclosure({ citations }: AnswerSourcesDisclosureProps) {
   if (citations.length === 0) {
     return null;
   }
 
-  const sourceLabel = `${citations.length} ${citations.length === 1 ? 'source' : 'sources'} ${verb}`;
+  const sourceLabel = `${citations.length} ${citations.length === 1 ? 'source' : 'sources'}`;
 
   return (
     <details className="group mt-5 border-t pt-3">
@@ -70,6 +66,38 @@ export function AnswerSourcesDisclosure({
                 <p className="truncate text-sm font-medium">{citation.sourceName}</p>
               </div>
               <SourceExcerpt citation={citation} />
+              {citation.sourceUrl && (
+                <a
+                  href={citation.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:underline"
+                >
+                  Open original source
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+              {Boolean(citation.sourceLinks?.length) && (
+                <details className="mt-2 text-xs text-muted-foreground">
+                  <summary className="cursor-pointer">
+                    Items in this curated source ({citation.sourceLinks!.length})
+                  </summary>
+                  <ul className="mt-2 max-h-40 space-y-2 overflow-y-auto">
+                    {citation.sourceLinks!.map((link) => (
+                      <li key={link.url}>
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="break-words underline-offset-4 hover:underline"
+                        >
+                          {link.title}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </div>
           </li>
         ))}

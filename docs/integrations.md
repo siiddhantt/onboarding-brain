@@ -85,6 +85,86 @@ pnpm --filter @app-starter/api test -- cognee-cloud.service.spec.ts cognee.servi
 
 ---
 
+## Discord: curated imports
+
+The first connector reads text from explicitly allowlisted server channels and
+public threads. It does not use your personal Discord account, post messages,
+download attachments, or run automatic syncs.
+
+### Set up a test bot
+
+1. Create your own Discord test server and a text channel such as `#onboarding-demo`.
+2. In the [Developer Portal](https://discord.com/developers/applications), create an
+   application. Under **Bot**, enable **Message Content Intent**. Presence and
+   Server Members intents are not needed.
+3. Under **Installation**, enable **Guild Install**, select the `bot` scope and
+   **View Channels** / **Read Message History** permissions. Use the install link
+   to add the bot to your test server. Do not grant Administrator permissions.
+4. Enable **Developer Mode** in Discord's **User Settings → Advanced**. Copy the
+   server ID and channel ID from their right-click menus.
+5. Generate a token under **Bot → Reset Token**. Keep it in `apps/api/.env`, never
+   in Git, the frontend, screenshots, or chat:
+
+```dotenv
+DISCORD_BOT_TOKEN=your-bot-token
+DISCORD_GUILD_ID=your-server-id
+DISCORD_CHANNEL_IDS=your-channel-id
+DISCORD_ORGANIZATION_ID=your-local-organization-id
+```
+
+Channel IDs are comma-separated. Public threads inherit eligibility from their
+allowlisted parent; a channel import does not recursively fetch its threads.
+Use a thread's own ID/link to review it. Private threads and DMs are unsupported.
+The organization ID is the UUID in the local app's organization URL. Restart the
+API after changing configuration. This read-only REST connector needs no public
+webhook endpoint or separate bot process.
+
+### Import and revise
+
+Open **Company brain → Knowledge → Import from a connected source** as an owner
+or admin. Paste a channel ID/link and preview. Select only useful items, confirm
+they may be shared with everyone in the organization, then import. The source's
+menu offers **Review selection** and **Remove from brain**.
+
+- Previewing makes Discord calls but no Cognee calls. Previews are bound to the
+  user and organization and expire from Redis after 15 minutes.
+- Read up to 100 messages per page, 500 items per preview, and select up to 100.
+  Selected items are indexed together, keeping their context and original links.
+- **Loaded items** filters fetched content locally. **Search source** uses the
+  connector's native search within the chosen collection (Discord: 25 results
+  per page). Date bounds use the curator's local days; Discord filters creation
+  time, not edit time. Selected items stay visible across searches and page loads.
+  Search indexing delays and rate limits are errors to retry, not empty results.
+  Native results reflect the provider's search index, which can lag recent messages.
+- PostgreSQL stores only selected text and excluded item IDs, not unselected
+  chatter. Existing selections stay checked; new items stay unchecked. Previously
+  selected items outside fetched pages are marked **Saved snapshot**.
+- Updates reuse the source identity. An unchanged selection skips indexing;
+  a changed selection uses the existing provider replacement operation.
+- Removal deletes derived knowledge and the locally retained text. An identity
+  tombstone prevents accidental re-import; re-adding requires explicit confirmation.
+- This is a reviewed snapshot, not a mirror: upstream edits/deletions require
+  another review. Source-channel permissions are not copied into the org dataset.
+- Credentials are operator-managed for one org/server per deployment in this
+  slice. Per-org OAuth connections, automatic sync, and durable job recovery are
+  separate follow-ups; do not use this as a production connector platform yet.
+
+`SourceConnector` owns provider access, pagination and normalization. The shared
+import service owns preview sessions and selection; `CompanyBrainService` owns
+identity and indexing through `KnowledgeEngine`. A Slack or document-service
+adapter can reuse these paths without adding Slack fields to the knowledge engine.
+Provider-specific authorization still needs an explicit implementation.
+Adapters advertise native search support and its date field; they translate
+plain text/date bounds and own opaque cursors. Without that capability the same
+preview offers loaded-item filtering. A preview is bounded, not a full search index.
+
+References: [Discord bot setup](https://docs.discord.com/developers/quick-start/getting-started),
+[message access](https://docs.discord.com/developers/resources/message#get-channel-messages),
+[threads](https://docs.discord.com/developers/topics/threads),
+[rate limits](https://docs.discord.com/developers/topics/rate-limits).
+
+---
+
 ## PostgreSQL
 
 The primary datastore. See [ADR 0004](adr/0004-postgresql-as-the-datastore.md).

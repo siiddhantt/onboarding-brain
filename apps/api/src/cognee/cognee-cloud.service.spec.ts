@@ -197,6 +197,7 @@ describe('CogneeCloudService', () => {
     expect(JSON.parse(fetcher.mock.calls[1][1]?.body as string)).toMatchObject({
       datasets: [datasetName],
       searchType: 'RAG_COMPLETION',
+      systemPrompt: expect.stringContaining('Do not add unstated steps, approvals'),
     });
   });
 

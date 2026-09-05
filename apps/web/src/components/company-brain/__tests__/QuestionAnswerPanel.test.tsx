@@ -77,6 +77,8 @@ describe('QuestionAnswerPanel', () => {
     expect(await screen.findByText('Use the finance portal.')).toBeInTheDocument();
     expect(screen.getByText('Employee handbook.pdf')).toBeInTheDocument();
     expect(screen.getByText('Submit expenses within 30 days.')).toBeInTheDocument();
+    expect(screen.getByText('1 source')).toBeInTheDocument();
+    expect(screen.queryByText('1 source used')).not.toBeInTheDocument();
   });
 
   it('states that no answer was generated when knowledge is insufficient', async () => {

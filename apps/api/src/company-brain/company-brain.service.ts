@@ -12,6 +12,7 @@ import {
   KnowledgeSource as PrismaKnowledgeSource,
   KnowledgeSourceStatus,
   OrgRole,
+  Prisma,
 } from '@prisma/client';
 import {
   CompanyBrainAnswer,
@@ -25,9 +26,11 @@ import {
   KNOWLEDGE_ENGINE,
   KnowledgeEngine,
   KnowledgeEngineAnswer,
+  KnowledgeContent,
 } from '../common/knowledge/knowledge-engine.interface';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { compileSource, CuratedSourceInput, readSelection } from './curated-source';
 
 const MANAGE_ROLES: readonly OrgRole[] = [OrgRole.OWNER, OrgRole.ADMIN];
 const MEMBER_ROLES: readonly OrgRole[] = [OrgRole.OWNER, OrgRole.ADMIN, OrgRole.MEMBER];
@@ -101,44 +104,12 @@ export class CompanyBrainService {
       },
     });
 
-    try {
-      const result = await this.knowledgeEngine.ingest({
-        organizationId,
-        content: {
-          kind: 'binary',
-          bytes: document.buffer,
-          fileName: document.name,
-          mimeType: document.mimetype,
-        },
-      });
-      const readySource = await this.prisma.knowledgeSource.update({
-        where: { id: source.id },
-        data: {
-          status: KnowledgeSourceStatus.READY,
-          providerReference: result.providerReference,
-          providerContainerReference: result.providerContainerReference,
-          lastIndexedAt: new Date(),
-          errorMessage: null,
-        },
-      });
-
-      return this.toSourceResponse(readySource);
-    } catch (error) {
-      this.logger.error(
-        `Failed to index knowledge source ${source.id}`,
-        error instanceof Error ? error.stack : String(error),
-      );
-
-      const failedSource = await this.prisma.knowledgeSource.update({
-        where: { id: source.id },
-        data: {
-          status: KnowledgeSourceStatus.FAILED,
-          errorMessage: FAILED_INGESTION_MESSAGE,
-        },
-      });
-
-      return this.toSourceResponse(failedSource);
-    }
+    return this.indexSource(source, {
+      kind: 'binary',
+      bytes: document.buffer,
+      fileName: document.name,
+      mimeType: document.mimetype,
+    });
   }
 
   async replaceDocument(
@@ -157,52 +128,209 @@ export class CompanyBrainService {
     }
 
     const source = await this.findActiveSource(organizationId, sourceId);
+    if (source.connectorId)
+      throw new BadRequestException('Review the connected source to change its selection.');
     await this.claimSource(source, KnowledgeSourceStatus.UPDATING);
-
-    try {
-      const content = {
-        kind: 'binary' as const,
+    return this.indexSource(
+      source,
+      {
+        kind: 'binary',
         bytes: document.buffer,
         fileName: document.name,
         mimeType: document.mimetype,
-      };
-      const result = source.providerReference
-        ? await this.knowledgeEngine.replace({
+      },
+      { name: document.name, mimeType: document.mimetype, sizeBytes: document.size },
+      true,
+    );
+  }
+
+  async getExternalSource(
+    userId: string,
+    organizationId: string,
+    connectorId: string,
+    externalId: string,
+  ) {
+    await this.requireRole(userId, organizationId, MANAGE_ROLES, 'review connected sources');
+    return this.prisma.knowledgeSource.findFirst({
+      where: { organizationId, connectorId, externalId },
+    });
+  }
+
+  async importSource(
+    userId: string,
+    organizationId: string,
+    input: CuratedSourceInput,
+  ): Promise<KnowledgeSource> {
+    const source = await this.getExternalSource(
+      userId,
+      organizationId,
+      input.connectorId,
+      input.externalId,
+    );
+    if (!this.knowledgeEngine.isConfigured())
+      throw new ServiceUnavailableException('The knowledge engine is not configured.');
+    const compiled = compileSource(input);
+    const sizeBytes = Buffer.byteLength(compiled.text);
+    if (sizeBytes > MAX_KNOWLEDGE_DOCUMENT_BYTES)
+      throw new BadRequestException('The selected content must be 10 MB or smaller.');
+    if (source?.archivedAt && (!input.wasRemoved || !input.restoreRemoved)) {
+      throw new ConflictException(
+        'This source was removed. Preview it again and explicitly choose to re-add it.',
+      );
+    }
+    if (
+      source &&
+      !source.archivedAt &&
+      source.status === KnowledgeSourceStatus.READY &&
+      source.contentHash === compiled.hash
+    ) {
+      const previous = readSelection(source.selection);
+      const selectedIds = new Set(input.selection.items.map((item) => item.id));
+      const excludedIds = [
+        ...new Set([...previous.excludedIds, ...input.selection.excludedIds]),
+      ].filter((id) => !selectedIds.has(id));
+      if (excludedIds.length !== previous.excludedIds.length) {
+        const saved = await this.prisma.knowledgeSource.updateMany({
+          where: {
+            id: source.id,
             organizationId,
+            version: source.version,
+            status: KnowledgeSourceStatus.READY,
+            archivedAt: null,
+          },
+          data: {
+            selection: {
+              items: input.selection.items,
+              excludedIds,
+            } as unknown as Prisma.InputJsonValue,
+          },
+        });
+        if (saved.count !== 1) throw new ConflictException(SOURCE_BUSY_MESSAGE);
+      }
+      return this.toSourceResponse(source);
+    }
+    if (
+      (source?.version ?? null) !== input.expectedVersion ||
+      Boolean(source?.archivedAt) !== input.wasRemoved
+    ) {
+      throw new ConflictException(
+        'This source changed after your preview. Review it again before importing.',
+      );
+    }
+    const metadata = {
+      name: input.name,
+      sourceUrl: input.url,
+      mimeType: 'text/plain',
+      sizeBytes,
+      contentHash: compiled.hash,
+      selection: input.selection as unknown as Prisma.InputJsonValue,
+    };
+    let claimed: PrismaKnowledgeSource;
+    if (source) {
+      await this.claimSource(source, KnowledgeSourceStatus.UPDATING, input.restoreRemoved);
+      claimed = source;
+    } else {
+      try {
+        claimed = await this.prisma.knowledgeSource.create({
+          data: {
+            organizationId,
+            createdById: userId,
+            sourceType: 'EXTERNAL',
+            connectorId: input.connectorId,
+            externalId: input.externalId,
+            status: KnowledgeSourceStatus.PROCESSING,
+            ...metadata,
+          },
+        });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          throw new ConflictException(
+            'This source is already being imported. Refresh its preview.',
+          );
+        }
+        throw error;
+      }
+    }
+    return this.indexSource(
+      claimed,
+      { kind: 'text', name: input.name, text: compiled.text },
+      metadata,
+      Boolean(source),
+    );
+  }
+
+  private async indexSource(
+    source: PrismaKnowledgeSource,
+    content: KnowledgeContent,
+    metadata: Prisma.KnowledgeSourceUpdateInput = {},
+    isReplacement = false,
+  ): Promise<KnowledgeSource> {
+    let indexed: Awaited<ReturnType<KnowledgeEngine['ingest']>> | undefined;
+    try {
+      indexed = source.providerReference
+        ? await this.knowledgeEngine.replace({
+            organizationId: source.organizationId,
             providerReference: source.providerReference,
             providerContainerReference: source.providerContainerReference,
             content,
           })
-        : await this.knowledgeEngine.ingest({ organizationId, content });
-      const readySource = await this.prisma.knowledgeSource.update({
-        where: { id: source.id },
+        : await this.knowledgeEngine.ingest({ organizationId: source.organizationId, content });
+      const ready = await this.prisma.knowledgeSource.update({
+        where: { id: source.id, organizationId: source.organizationId },
         data: {
-          name: document.name,
-          mimeType: document.mimetype,
-          sizeBytes: document.size,
+          ...metadata,
           status: KnowledgeSourceStatus.READY,
-          providerReference: result.providerReference,
+          providerReference: indexed.providerReference,
           providerContainerReference:
-            result.providerContainerReference ?? source.providerContainerReference,
-          version: { increment: 1 },
+            indexed.providerContainerReference ?? source.providerContainerReference,
+          ...(isReplacement ? { version: { increment: 1 } } : {}),
           lastIndexedAt: new Date(),
           errorMessage: null,
         },
       });
-
-      return this.toSourceResponse(readySource);
+      return this.toSourceResponse(ready);
     } catch (error) {
       this.logger.error(
-        `Failed to replace knowledge source ${source.id}`,
+        `Failed to index knowledge source ${source.id}`,
         error instanceof Error ? error.stack : String(error),
       );
-      await this.finishSourceMutationFailure(
-        source,
-        KnowledgeSourceStatus.UPDATING,
-        KnowledgeSourceStatus.FAILED,
-        FAILED_REPLACEMENT_MESSAGE,
-      );
-      throw new ServiceUnavailableException(FAILED_REPLACEMENT_MESSAGE);
+      const errorMessage = isReplacement ? FAILED_REPLACEMENT_MESSAGE : FAILED_INGESTION_MESSAGE;
+      if (isReplacement) {
+        await this.prisma.knowledgeSource.updateMany({
+          where: {
+            id: source.id,
+            organizationId: source.organizationId,
+            status: KnowledgeSourceStatus.UPDATING,
+            archivedAt: null,
+          },
+          data: {
+            status: KnowledgeSourceStatus.FAILED,
+            errorMessage,
+            ...(indexed
+              ? {
+                  providerReference: indexed.providerReference,
+                  providerContainerReference: indexed.providerContainerReference,
+                }
+              : {}),
+          },
+        });
+        throw new ServiceUnavailableException(errorMessage);
+      }
+      const failed = await this.prisma.knowledgeSource.update({
+        where: { id: source.id, organizationId: source.organizationId },
+        data: {
+          status: KnowledgeSourceStatus.FAILED,
+          errorMessage,
+          // Preserve a successful provider operation's identity if local finalization failed.
+          ...(indexed
+            ? {
+                providerReference: indexed.providerReference,
+                providerContainerReference: indexed.providerContainerReference,
+              }
+            : {}),
+        },
+      });
+      return this.toSourceResponse(failed);
     }
   }
 
@@ -242,11 +370,19 @@ export class CompanyBrainService {
 
     try {
       await this.prisma.knowledgeSource.update({
-        where: { id: source.id },
+        where: { id: source.id, organizationId },
         data: {
           status: source.status,
           archivedAt: new Date(),
           errorMessage: null,
+          ...(source.connectorId
+            ? {
+                selection: Prisma.DbNull,
+                contentHash: null,
+                providerReference: null,
+                providerContainerReference: null,
+              }
+            : {}),
         },
       });
     } catch (error) {
@@ -309,6 +445,15 @@ export class CompanyBrainService {
           sourceName: source?.name ?? citation.label ?? 'Company knowledge',
           excerpt: citation.excerpt,
           score: citation.score,
+          ...(source?.sourceUrl
+            ? {
+                sourceUrl: source.sourceUrl,
+                sourceLinks: readSelection(source.selection).items.map((item) => ({
+                  title: item.title,
+                  url: item.url,
+                })),
+              }
+            : {}),
         };
       }),
     };
@@ -362,6 +507,7 @@ export class CompanyBrainService {
   private async claimSource(
     source: PrismaKnowledgeSource,
     nextStatus: typeof KnowledgeSourceStatus.UPDATING | typeof KnowledgeSourceStatus.REMOVING,
+    restoreRemoved = false,
   ): Promise<void> {
     if (
       source.status === KnowledgeSourceStatus.PROCESSING ||
@@ -375,11 +521,15 @@ export class CompanyBrainService {
       where: {
         id: source.id,
         organizationId: source.organizationId,
-        archivedAt: null,
+        archivedAt: restoreRemoved && source.archivedAt ? source.archivedAt : null,
         status: source.status,
         version: source.version,
       },
-      data: { status: nextStatus, errorMessage: null },
+      data: {
+        status: nextStatus,
+        errorMessage: null,
+        ...(restoreRemoved ? { archivedAt: null } : {}),
+      },
     });
 
     if (result.count !== 1) {
@@ -422,7 +572,7 @@ export class CompanyBrainService {
       id: source.id,
       organizationId: source.organizationId,
       createdById: source.createdById,
-      sourceType: 'DOCUMENT',
+      sourceType: source.connectorId ? 'EXTERNAL' : 'DOCUMENT',
       name: source.name,
       mimeType: source.mimeType,
       sizeBytes: source.sizeBytes,
@@ -432,6 +582,16 @@ export class CompanyBrainService {
       errorMessage: source.errorMessage,
       createdAt: source.createdAt.toISOString(),
       updatedAt: source.updatedAt.toISOString(),
+      ...(source.connectorId && source.externalId && source.sourceUrl
+        ? {
+            origin: {
+              connectorId: source.connectorId,
+              externalId: source.externalId,
+              url: source.sourceUrl,
+              itemCount: readSelection(source.selection).items.length,
+            },
+          }
+        : {}),
     };
   }
 }

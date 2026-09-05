@@ -1,10 +1,12 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
+import type { KnowledgeSource } from '@app-starter/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { KnowledgeSourcesPanel } from '@/components/company-brain/KnowledgeSourcesPanel';
+import { SourceImportPanel } from '@/components/company-brain/SourceImportPanel';
 import { Card, CardContent } from '@/components/ui/card';
 import { companyBrainApi } from '@/lib/company-brain-api';
 import { organizationsApi } from '@/lib/organizations-api';
@@ -16,6 +18,7 @@ interface PageProps {
 export default function KnowledgePage({ params }: PageProps) {
   const { organizationId } = use(params);
   const queryClient = useQueryClient();
+  const [reviewSource, setReviewSource] = useState<KnowledgeSource | null>(null);
   const statusQuery = useQuery({
     queryKey: ['company-brain-status', organizationId],
     queryFn: () => companyBrainApi.getStatus(organizationId),
@@ -103,25 +106,43 @@ export default function KnowledgePage({ params }: PageProps) {
         </Card>
       )}
       {!hasLoadError && (
-        <KnowledgeSourcesPanel
-          sources={sourcesQuery.data?.items ?? []}
-          canManage={canManage}
-          isConfigured={isConfigured}
-          isUploading={uploadMutation.isPending}
-          replacingSourceId={
-            replaceMutation.isPending ? (replaceMutation.variables?.sourceId ?? null) : null
-          }
-          removingSourceId={removeMutation.isPending ? (removeMutation.variables ?? null) : null}
-          onUpload={async (file) => {
-            await uploadMutation.mutateAsync(file);
-          }}
-          onReplace={async (sourceId, file) => {
-            await replaceMutation.mutateAsync({ sourceId, file });
-          }}
-          onRemove={async (sourceId) => {
-            await removeMutation.mutateAsync(sourceId);
-          }}
-        />
+        <>
+          {canManage && (
+            <SourceImportPanel
+              key={organizationId}
+              organizationId={organizationId}
+              isConfigured={isConfigured}
+              reviewSource={reviewSource}
+              onImported={async () => {
+                await queryClient.invalidateQueries({
+                  queryKey: ['knowledge-sources', organizationId],
+                });
+              }}
+            />
+          )}
+          <KnowledgeSourcesPanel
+            sources={sourcesQuery.data?.items ?? []}
+            canManage={canManage}
+            isConfigured={isConfigured}
+            isUploading={uploadMutation.isPending}
+            replacingSourceId={
+              replaceMutation.isPending ? (replaceMutation.variables?.sourceId ?? null) : null
+            }
+            removingSourceId={removeMutation.isPending ? (removeMutation.variables ?? null) : null}
+            onUpload={async (file) => {
+              await uploadMutation.mutateAsync(file);
+            }}
+            onReview={(source) => {
+              setReviewSource({ ...source });
+            }}
+            onReplace={async (sourceId, file) => {
+              await replaceMutation.mutateAsync({ sourceId, file });
+            }}
+            onRemove={async (sourceId) => {
+              await removeMutation.mutateAsync(sourceId);
+            }}
+          />
+        </>
       )}
     </div>
   );

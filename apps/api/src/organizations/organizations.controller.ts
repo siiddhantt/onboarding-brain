@@ -76,7 +76,7 @@ export class OrganizationsController {
   @UseGuards(JwtAuthGuard, EmailVerifiedGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Get a organization by ID — requires auth but not organization membership',
+    summary: 'Get private organization details — requires organization membership',
   })
   @ApiResponse({ status: 200, type: OrganizationResponseDto })
   @ApiResponse({ status: 404, description: 'Organization not found' })
