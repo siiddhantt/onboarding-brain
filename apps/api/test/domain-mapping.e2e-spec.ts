@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
@@ -33,7 +34,7 @@ describe('DomainMapping (e2e)', () => {
       }),
     );
     app.setGlobalPrefix('api');
-    await app.init();
+    await app.listen(0, '127.0.0.1');
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     dnsService = moduleFixture.get<DnsService>(DnsService);
@@ -89,7 +90,8 @@ describe('DomainMapping (e2e)', () => {
 
   describe('Full Workflow', () => {
     let mappingId: string;
-    const domain = 'events.e2e-test.com';
+    // A failed prior workflow may leave its five-minute Redis resolution cache.
+    const domain = `events-${randomUUID()}.example.com`;
 
     it('should create a domain mapping', async () => {
       const res = await request(app.getHttpServer())
