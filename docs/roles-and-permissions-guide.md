@@ -42,6 +42,13 @@ Enforcement rules worth knowing:
   role cannot be changed by anyone else.
 - `ADMIN` and `OWNER` both manage invites and settings; everything else is
   `MEMBER`-visible.
+- A department contact references a current organization membership, not a
+  global user. Composite foreign keys enforce the same organization on both
+  sides; removing membership also removes its contact assignments.
+- Email-addressed invites require that recipient's verified email. Acceptance
+  consumes the single-use invite and creates membership in one transaction.
+- Only owners may remove owners, and concurrent removals cannot leave an
+  organization without an owner.
 
 The invited role is fixed at send time (`OrganizationInvite.invitedRole`) and
 is immutable afterwards — changing someone's role after they accept is a

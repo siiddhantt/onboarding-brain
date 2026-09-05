@@ -154,13 +154,25 @@ export class DepartmentsService {
       throw new ConflictException('This member is already a contact for the department');
     }
 
-    await this.prisma.departmentContact.create({
-      data: {
-        organizationId,
-        departmentId: department.id,
-        organizationMemberId: organizationMember.id,
-      },
-    });
+    try {
+      await this.prisma.departmentContact.create({
+        data: {
+          organizationId,
+          departmentId: department.id,
+          organizationMemberId: organizationMember.id,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          throw new ConflictException('This member is already a department contact');
+        }
+        if (error.code === 'P2003') {
+          throw new NotFoundException('Department or organization member no longer exists');
+        }
+      }
+      throw error;
+    }
 
     return this.loadResponse(organizationId, department.id);
   }

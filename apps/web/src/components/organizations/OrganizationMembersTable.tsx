@@ -130,7 +130,7 @@ function TableActions({
   const canManageRoles =
     currentUserRole && (currentUserRole === 'OWNER' || currentUserRole === 'ADMIN');
 
-  const canRemove = userRole && currentUserRole;
+  const canRemove = canManageRoles && (userRole !== 'OWNER' || currentUserRole === 'OWNER');
 
   return (
     <DropdownMenu>
@@ -310,7 +310,9 @@ export function OrganizationMembersTable({
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="OWNER">OWNER</SelectItem>
+                            {currentUserRole === 'OWNER' && (
+                              <SelectItem value="OWNER">OWNER</SelectItem>
+                            )}
                             <SelectItem value="ADMIN">ADMIN</SelectItem>
                             <SelectItem value="MEMBER">MEMBER</SelectItem>
                           </SelectContent>
@@ -364,8 +366,12 @@ export function OrganizationMembersTable({
             <AlertDialogTitle>Remove Member</AlertDialogTitle>
             <AlertDialogDescription className="text-left sm:text-left">
               Are you sure you want to remove{' '}
-              <strong>{userToRemove?.user.name || userToRemove?.user.email}</strong> from this
-              organization? This action cannot be undone.
+              <strong className="break-words">
+                {userToRemove?.user.name
+                  ? `${userToRemove.user.name} (${userToRemove.user.email})`
+                  : userToRemove?.user.email}
+              </strong>{' '}
+              from this organization? Their department contact assignments will also be removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">

@@ -173,6 +173,7 @@ model OrganizationMember {
   departmentContacts DepartmentContact[]
 
   @@unique([userId, organizationId])
+  @@unique([id, organizationId])
   @@index([userId])
   @@index([organizationId])
   @@index([userId, role, organizationId])
@@ -448,6 +449,7 @@ model Department {
   contacts     DepartmentContact[]
 
   @@unique([organizationId, slug])
+  @@unique([id, organizationId])
   @@index([organizationId, archivedAt, name])
   @@map("departments")
 }
@@ -460,8 +462,8 @@ model DepartmentContact {
   createdAt            DateTime @default(now()) @db.Timestamptz(6)
 
   organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  department         Department         @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  organizationMember OrganizationMember @relation(fields: [organizationMemberId], references: [id], onDelete: Cascade)
+  department         Department         @relation(fields: [departmentId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  organizationMember OrganizationMember @relation(fields: [organizationMemberId, organizationId], references: [id, organizationId], onDelete: Cascade)
 
   @@unique([departmentId, organizationMemberId])
   @@index([organizationId, departmentId])

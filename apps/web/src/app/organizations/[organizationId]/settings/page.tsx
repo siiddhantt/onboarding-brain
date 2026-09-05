@@ -55,12 +55,22 @@ export default function OrganizationSettingsPage({ params }: PageProps) {
     queryFn: () => domainMappingsApi.list(organizationId),
   });
 
-  if (isLoading || !organization) {
+  if (isLoading) {
     return (
       <PageContainer>
         <div className="flex justify-center py-24">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
+      </PageContainer>
+    );
+  }
+
+  if (!organization) {
+    return (
+      <PageContainer>
+        <p className="mx-auto max-w-4xl px-4 py-16 text-center text-muted-foreground">
+          Organization not found, or you no longer have access to it.
+        </p>
       </PageContainer>
     );
   }
@@ -135,7 +145,13 @@ export default function OrganizationSettingsPage({ params }: PageProps) {
               currentUserId={currentUserId}
               currentUserRole={role}
               organizationId={organizationId}
-              onUserRemoved={() => refetchMembers()}
+              onUserRemoved={() => {
+                void refetchMembers();
+                void queryClient.invalidateQueries({ queryKey: ['departments', organizationId] });
+                void queryClient.invalidateQueries({
+                  queryKey: ['organization-role', organizationId],
+                });
+              }}
             />
 
             {canManage && <OrganizationPendingInvitesCard organizationId={organizationId} />}

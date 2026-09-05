@@ -12,6 +12,7 @@ import {
   InviteCancelledException,
   EmailVerificationNotFoundException,
   EmailVerificationExpiredException,
+  InvitePermissionException,
 } from './exceptions/invites.exceptions';
 
 describe('OrganizationInvitesService', () => {
@@ -24,6 +25,7 @@ describe('OrganizationInvitesService', () => {
       findFirst: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
     inviteEmailVerification: {
       create: jest.fn(),
@@ -40,6 +42,7 @@ describe('OrganizationInvitesService', () => {
     organizationMember: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      upsert: jest.fn(),
       count: jest.fn(),
     },
     $transaction: jest.fn(),
@@ -193,36 +196,12 @@ describe('OrganizationInvitesService', () => {
       expect(mockNotificationsService.sendNotification).toHaveBeenCalled();
     });
 
-    it('should allow MEMBER to create invitation', async () => {
+    it('rejects invitation creation by a regular member', async () => {
       mockOrganizationsService.getUserRoleInOrganization.mockResolvedValue(OrgRole.MEMBER);
-      const expiresAt = new Date();
-      expiresAt.setMonth(expiresAt.getMonth() + 6);
-
-      const mockInvite = {
-        id: 'invite-123',
-        organizationId,
-        token: 'test-token',
-        email: null,
-        invitedRole: PrismaOrganizationRole.MEMBER,
-        isReusable: false,
-        expiresAt,
-        status: InviteStatus.PENDING,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        createdBy: userId,
-        organization: mockOrganization,
-      };
-
-      mockPrismaService.organizationInvite.create.mockResolvedValue(mockInvite);
-
-      const result = await service.createInvite(organizationId, userId, undefined, OrgRole.MEMBER);
-
-      expect(result).toMatchObject({
-        id: mockInvite.id,
-        organizationId: mockInvite.organizationId,
-        token: mockInvite.token,
-      });
-      expect(mockPrismaService.organizationInvite.create).toHaveBeenCalled();
+      await expect(
+        service.createInvite(organizationId, userId, undefined, OrgRole.MEMBER),
+      ).rejects.toThrow(InvitePermissionException);
+      expect(mockPrismaService.organizationInvite.create).not.toHaveBeenCalled();
     });
 
     it('should throw error if organization does not exist', async () => {
@@ -396,6 +375,16 @@ describe('OrganizationInvitesService', () => {
       ...overrides,
     });
 
+    beforeEach(() => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        email: 'test@example.com',
+        emailVerifiedAt: new Date(),
+      });
+      mockPrismaService.organizationInvite.updateMany.mockResolvedValue({ count: 1 });
+      mockPrismaService.organizationMember.upsert.mockResolvedValue({ role: OrgRole.MEMBER });
+      mockPrismaService.$transaction.mockImplementation((callback) => callback(mockPrismaService));
+    });
+
     it('should accept invitation and add user to organization', async () => {
       const mockInvite = createMockInvite();
       const mockOrganization = {
@@ -419,8 +408,13 @@ describe('OrganizationInvitesService', () => {
       expect(result.organization.id).toBe(organizationId);
       expect(result.role).toBe(OrgRole.MEMBER);
       expect(result.message).toBe('You have been added to the organization');
-      expect(mockPrismaService.organizationMember.create).toHaveBeenCalled();
-      expect(mockPrismaService.organizationInvite.update).toHaveBeenCalled();
+      expect(mockPrismaService.organizationMember.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: {},
+          create: { userId, organizationId, role: OrgRole.MEMBER },
+        }),
+      );
+      expect(mockPrismaService.organizationInvite.updateMany).toHaveBeenCalled();
     });
 
     it('should handle existing organization membership gracefully', async () => {
@@ -585,13 +579,13 @@ describe('OrganizationInvitesService', () => {
           },
           organizationMember: {
             findUnique: jest.fn().mockResolvedValue(null),
-            create: jest.fn().mockResolvedValue({}),
+            upsert: jest.fn().mockResolvedValue({ role: OrgRole.MEMBER }),
           },
           inviteEmailVerification: {
-            update: jest.fn().mockResolvedValue({ ...mockVerification, usedAt: new Date() }),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
           organizationInvite: {
-            update: jest.fn().mockResolvedValue({ ...mockInvite, status: InviteStatus.ACCEPTED }),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
         return callback(tx);
@@ -637,13 +631,13 @@ describe('OrganizationInvitesService', () => {
           },
           organizationMember: {
             findUnique: jest.fn().mockResolvedValue(null),
-            create: jest.fn().mockResolvedValue({}),
+            upsert: jest.fn().mockResolvedValue({ role: OrgRole.MEMBER }),
           },
           inviteEmailVerification: {
-            update: jest.fn().mockResolvedValue({ ...mockVerification, usedAt: new Date() }),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
           organizationInvite: {
-            update: jest.fn().mockResolvedValue({ ...mockInvite, status: InviteStatus.ACCEPTED }),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
         return callback(tx);

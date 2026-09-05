@@ -49,7 +49,14 @@ export const DepartmentSettingsCard = ({
     () => new Set(department.contacts.map((contact) => contact.organizationMemberId)),
     [department.contacts],
   );
-  const availableMembers = members.filter((member) => !assignedMemberIds.has(member.id));
+  const availableMembers = members.filter(
+    (member) => member.organizationId === organizationId && !assignedMemberIds.has(member.id),
+  );
+  const selectedMember = availableMembers.find((member) => member.id === selectedMemberId);
+
+  useEffect(() => {
+    if (!selectedMember) setSelectedMemberId('');
+  }, [selectedMember]);
   const hasChanges =
     name.trim() !== department.name || description.trim() !== (department.description ?? '');
 
@@ -89,7 +96,7 @@ export const DepartmentSettingsCard = ({
 
   const handleAssignContact = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedMemberId) return;
+    if (!selectedMember) return;
 
     setPendingAction('assign');
     try {
@@ -232,13 +239,19 @@ export const DepartmentSettingsCard = ({
                 )}
               </div>
 
-              <form onSubmit={handleAssignContact} className="flex flex-col gap-2 sm:flex-row">
+              <form
+                onSubmit={handleAssignContact}
+                className="flex flex-col gap-2 sm:flex-row sm:items-center"
+              >
                 <Select
-                  value={selectedMemberId}
+                  value={selectedMember?.id ?? ''}
                   onValueChange={setSelectedMemberId}
                   disabled={availableMembers.length === 0 || pendingAction !== null}
                 >
-                  <SelectTrigger aria-label={`Choose a contact for ${department.name}`}>
+                  <SelectTrigger
+                    className="h-12"
+                    aria-label={`Choose a contact for ${department.name}`}
+                  >
                     <SelectValue
                       placeholder={
                         availableMembers.length === 0 ? 'All members assigned' : 'Choose member'
@@ -248,7 +261,12 @@ export const DepartmentSettingsCard = ({
                   <SelectContent>
                     {availableMembers.map((member) => (
                       <SelectItem key={member.id} value={member.id}>
-                        {member.user.name || member.user.email}
+                        <span className="flex min-w-0 flex-col text-left">
+                          {member.user.name && <span className="truncate">{member.user.name}</span>}
+                          <span className="truncate text-xs text-muted-foreground">
+                            {member.user.email}
+                          </span>
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -256,7 +274,7 @@ export const DepartmentSettingsCard = ({
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={!selectedMemberId || pendingAction !== null}
+                  disabled={!selectedMember || pendingAction !== null}
                 >
                   {pendingAction === 'assign' ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
