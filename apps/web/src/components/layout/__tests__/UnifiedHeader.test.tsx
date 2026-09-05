@@ -1,25 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { UnifiedHeader } from '../UnifiedHeader';
-import { usePathname } from 'next/navigation';
 import { LOGO_PATH } from '@/lib/brand';
+import { useAuth } from '@/hooks/use-auth';
+import { getManagementUrl } from '@/lib/url-generator';
 
-// Mock next/navigation
-jest.mock('next/navigation', () => ({
-  usePathname: jest.fn(),
-}));
-
-// Mock the navigation barrel to track logoSrc
-jest.mock('@/components/ui/navigation', () => {
-  const actual = jest.requireActual('@/components/ui/navigation');
-  return {
-    ...actual,
-    HeaderBrand: jest.fn(({ logoSrc, brandName }) => (
-      <div data-testid="header-brand" data-logo={logoSrc} data-brand={brandName}>
-        {brandName}
-      </div>
-    )),
-  };
-});
+jest.mock('@/hooks/use-auth', () => ({ useAuth: jest.fn() }));
 
 // Mock other components used in UnifiedHeader
 jest.mock('@/components/public/UserProfileMenu', () => ({
@@ -34,28 +19,44 @@ jest.mock('@/components/notifications/NotificationCenter', () => ({
 
 describe('UnifiedHeader', () => {
   beforeEach(() => {
-    (usePathname as jest.Mock).mockReturnValue('/');
+    (useAuth as jest.Mock).mockReturnValue({ isLoaded: true, isAuthenticated: false });
   });
 
   it('uses default logo when customLogoUrl is not provided', () => {
     render(<UnifiedHeader />);
-    const brand = screen.getByTestId('header-brand');
-    expect(brand.getAttribute('data-logo')).toBe(LOGO_PATH);
-    expect(brand.getAttribute('data-brand')).toBe('Onboarding Brain');
+    const brand = screen.getByRole('link', { name: 'Onboarding Brain home' });
+    expect(brand.querySelector('img')).toHaveAttribute('src', LOGO_PATH);
+    expect(brand).toHaveTextContent('Onboarding Brain');
   });
 
   it('uses custom logo when customLogoUrl is provided', () => {
     const customLogoUrl = 'https://example.com/custom-logo.png';
     render(<UnifiedHeader customLogoUrl={customLogoUrl} />);
-    const brand = screen.getByTestId('header-brand');
-    expect(brand.getAttribute('data-logo')).toBe(customLogoUrl);
-    expect(brand.getAttribute('data-brand')).toBe('');
+    const brand = screen.getByRole('link', { name: 'Onboarding Brain home' });
+    expect(brand.querySelector('img')).toHaveAttribute('src', customLogoUrl);
+    expect(brand).toHaveTextContent('');
   });
 
   it('uses default logo when customLogoUrl is null', () => {
     render(<UnifiedHeader customLogoUrl={null} />);
-    const brand = screen.getByTestId('header-brand');
-    expect(brand.getAttribute('data-logo')).toBe(LOGO_PATH);
-    expect(brand.getAttribute('data-brand')).toBe('Onboarding Brain');
+    const brand = screen.getByRole('link', { name: 'Onboarding Brain home' });
+    expect(brand.querySelector('img')).toHaveAttribute('src', LOGO_PATH);
+    expect(brand).toHaveTextContent('Onboarding Brain');
+  });
+
+  it('exposes sign-in without opening a mobile menu', () => {
+    render(<UnifiedHeader />);
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      getManagementUrl('/login'),
+    );
+    expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument();
+  });
+
+  it('keeps workspace navigation for signed-in users', () => {
+    (useAuth as jest.Mock).mockReturnValue({ isLoaded: true, isAuthenticated: true });
+    render(<UnifiedHeader />);
+    expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
   });
 });

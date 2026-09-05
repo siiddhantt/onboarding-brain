@@ -14,16 +14,17 @@ import { domainMappingsApi } from '@/lib/domain-mappings-api';
 import { CustomDomainProvider } from '@/components/providers/CustomDomainProvider';
 import { CookieConsentBanner } from '@/components/consent/CookieConsentBanner';
 import { ACCESS_TOKEN_KEY } from '@/lib/auth-storage';
+import { BRAND_NAME, LOGO_PATH } from '@/lib/brand';
 
 export async function generateMetadata(): Promise<Metadata> {
   const headersList = await headers();
   const host = headersList.get('host') || '';
 
   const defaultMetadata: Metadata = {
-    title: 'Onboarding Brain',
+    title: BRAND_NAME,
     description: 'Source-backed answers from the onboarding knowledge your organization provides.',
     icons: {
-      icon: '/images/brain-mark.svg',
+      icon: LOGO_PATH,
     },
   };
 

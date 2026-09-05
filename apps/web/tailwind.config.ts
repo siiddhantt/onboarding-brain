@@ -19,6 +19,7 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ['"IBM Plex Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        display: ['var(--font-display)'],
       },
       /* Semantic color aliases → DS tokens (RGB for opacity modifiers) */
       colors: {

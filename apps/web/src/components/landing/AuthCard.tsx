@@ -60,15 +60,15 @@ export function AuthCard({ initialMode = 'login' }: AuthCardProps) {
   const googleReturnUrl = redirectParam || undefined;
 
   return (
-    <Card className="mx-auto w-full max-w-md shadow-md">
-      <CardHeader className="pb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">
+    <Card className="mx-auto w-full max-w-md rounded-2xl shadow-sm">
+      <CardHeader className="pb-5">
+        <h1 className="font-display text-2xl font-medium tracking-tight">
           {mode === 'signup' ? 'Create your account' : 'Sign in'}
         </h1>
         <p className="text-sm text-muted-foreground">
           {mode === 'signup'
             ? 'Set up your workspace and invite your team.'
-            : 'Continue to your organization’s company brain.'}
+            : 'Good to see you. Pick up where you left off.'}
         </p>
       </CardHeader>
       <CardContent>

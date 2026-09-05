@@ -32,21 +32,21 @@ export default function LoginPage() {
   // Show loading state while checking authentication
   if (isCheckingAuth) {
     return (
-      <main className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+      <div className="min-h-[calc(100svh-4rem)] bg-background flex items-center justify-center">
         <div className="text-muted-foreground">Loading...</div>
-      </main>
+      </div>
     );
   }
 
   // Only show login/signup if not authenticated
   return (
-    <main className="min-h-[calc(100svh-4rem)] bg-background px-4 py-6 pb-36 sm:px-6 sm:py-8 lg:grid lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-center lg:gap-16 lg:px-12 xl:px-20">
+    <div className="mx-auto grid min-h-[calc(100svh-4rem)] max-w-6xl items-center gap-10 bg-background px-5 py-10 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-16">
       <div className="hidden lg:block">
         <LandingHero />
       </div>
       <div className="mx-auto w-full max-w-md lg:mx-0">
         <AuthCard initialMode={initialMode} />
       </div>
-    </main>
+    </div>
   );
 }
