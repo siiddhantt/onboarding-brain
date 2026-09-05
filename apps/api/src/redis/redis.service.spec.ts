@@ -51,6 +51,7 @@ describe('RedisService', () => {
       expect(RedisMock).toHaveBeenCalledWith(
         'redis://example.com:6379/0',
         expect.objectContaining({
+          protocol: 2,
           family: 0,
           keepAlive: 10000,
           retryStrategy: expect.any(Function),

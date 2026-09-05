@@ -14,6 +14,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     // Common options for reliability on cloud platforms like Railway
     const commonOptions: RedisOptions = {
+      protocol: 2, // Preserve existing response shapes when upgrading ioredis.
       family: 0, // Auto-detect IPv4/IPv6
       retryStrategy: (times: number) => {
         const delay = Math.min(times * 50, 2000);

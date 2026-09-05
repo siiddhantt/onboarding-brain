@@ -31,7 +31,7 @@ kept only in the current page session.
 
 ## Run locally
 
-Requirements: Node 22+, pnpm, and Docker.
+Requirements: Node 22.22.2 (see `.nvmrc`) or a supported newer version, pnpm, and Docker.
 
 ```bash
 git clone https://github.com/siiddhantt/onboarding-brain.git

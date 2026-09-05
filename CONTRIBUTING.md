@@ -17,7 +17,7 @@ applies migrations, and seeds Northstar Studio. Re-running it preserves existing
 env files, passwords, and configuration. The [README](README.md) has the demo
 accounts and a short walkthrough.
 
-You need Node 22+, pnpm 8+, and Docker (or Podman). You do **not** need any
+Use the Node version in `.nvmrc`, pnpm 10.26, and Docker (or Podman). You do **not** need any
 third-party accounts — Postgres, Redis, and Mailpit all run locally, and every
 external integration is optional. See
 [`docs/integrations.md`](./docs/integrations.md) if you need one of them.
