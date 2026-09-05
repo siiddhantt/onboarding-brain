@@ -87,9 +87,29 @@ pnpm --filter @app-starter/api test -- cognee-cloud.service.spec.ts cognee.servi
 
 ## Discord: curated imports
 
-The first connector reads text from explicitly allowlisted server channels and
-public threads. It does not use your personal Discord account, post messages,
-download attachments, or run automatic syncs.
+The first connector reads text from saved server channels and public threads.
+Each organization owns its connections, credentials and saved locations. It does
+not use your personal Discord account, post messages, download attachments, or
+run automatic syncs.
+
+### Credential storage
+
+The app operator sets `SOURCE_CREDENTIALS_ENCRYPTION_KEY` in `apps/api/.env` to
+a random 32-byte hex key (`openssl rand -hex 32`). Restart the API after setting
+it. This is infrastructure configuration, not a Discord token. Without it,
+connections are unavailable; documents and the rest of the app still work.
+
+Credentials are encrypted with AES-256-GCM and bound to their organization and
+connection. Keep the key out of Git, logs and database backups; store a secure
+backup separately. All API replicas need the same key. HTTPS is required outside
+local development. Do not simply replace the key: existing credentials then
+cannot be decrypted. Until a re-encryption/keyring tool exists, key rotation
+requires replacing each connection credential in the UI. A managed secret store
+can replace `ConnectionCredentials` without changing source adapters.
+
+Cognee's deployment key remains the operator's knowledge-engine credential;
+organization datasets are isolated by the application. Source credentials are a
+different boundary. Per-organization Cognee billing/BYOK is not implemented.
 
 ### Set up a test bot
 
@@ -101,33 +121,52 @@ download attachments, or run automatic syncs.
    **View Channels** / **Read Message History** permissions. Use the install link
    to add the bot to your test server. Do not grant Administrator permissions.
 4. Enable **Developer Mode** in Discord's **User Settings → Advanced**. Copy the
-   server ID and channel ID from their right-click menus.
-5. Generate a token under **Bot → Reset Token**. Keep it in `apps/api/.env`, never
-   in Git, the frontend, screenshots, or chat:
+   server ID from its right-click menu once.
+5. Generate a token under **Bot → Reset Token**. In the app, open **Company brain
+   → Knowledge → Import from a connected source → Connect source**. Choose a
+   name, enter the server ID and token, then connect. Never put the token in Git,
+   screenshots or chat. It is write-only and verified before being stored.
+6. Choose **Save location** to find readable channels by name. Use a public
+   thread's link for threads not in that list. Saving a channel does not select
+   its messages, save its child threads, or authorize future replies.
 
-```dotenv
-DISCORD_BOT_TOKEN=your-bot-token
-DISCORD_GUILD_ID=your-server-id
-DISCORD_CHANNEL_IDS=your-channel-id
-DISCORD_ORGANIZATION_ID=your-local-organization-id
-```
+Private threads and DMs are unsupported. This read-only REST connector needs no
+public webhook endpoint or separate bot process. Limit the bot's Discord channel
+permissions to the content the organization's curators are authorized to browse.
+Bot access does not prove the curator personally has the same Discord permissions.
 
-Channel IDs are comma-separated. Public threads inherit eligibility from their
-allowlisted parent; a channel import does not recursively fetch its threads.
-Use a thread's own ID/link to review it. Private threads and DMs are unsupported.
-The organization ID is the UUID in the local app's organization URL. Restart the
-API after changing configuration. This read-only REST connector needs no public
-webhook endpoint or separate bot process.
+### Manage connections
+
+Connection options let an owner/admin rename a connection, verify access or
+replace its token without restarting the app. A failed check leaves the existing
+credential unchanged. Use another connection for a different server; one server
+has one connection per organization. The same server can be connected separately
+in another organization using that organization's own credential.
+
+**Disconnect** erases the stored credential, invalidates previews and preserves
+saved locations for reconnection. It does not revoke the token in Discord.
+**Forget saved location** removes the shortcut, not the published knowledge.
+Remove knowledge separately from the indexed source's menu. These operations
+cannot cancel an import already accepted for indexing. No upstream messages are
+changed by any of these actions.
+
+For an existing env-based installation, set the encryption key, apply migrations,
+then run `pnpm --filter @app-starter/api exec ts-node scripts/migrate-discord-connection.ts`.
+This explicit, retryable upgrade reads the four old `DISCORD_*` fields, verifies
+the bot and saves its previously allowlisted channels in the configured org.
+Published snapshots are unchanged. Check the UI, then remove the old fields from
+`.env`; runtime code no longer reads them. See [ADR 0013](adr/0013-organization-owned-source-connections.md).
 
 ### Import and revise
 
 Open **Company brain → Knowledge → Import from a connected source** as an owner
-or admin. Paste a channel ID/link and preview. Select only useful items, confirm
+or admin. Choose a connection and saved location, then preview. Select useful items, confirm
 they may be shared with everyone in the organization, then import. The source's
 menu offers **Review selection** and **Remove from brain**.
 
 - Previewing makes Discord calls but no Cognee calls. Previews are bound to the
-  user and organization and expire from Redis after 15 minutes.
+  user, organization, saved location and connection revision and expire from
+  Redis after 15 minutes. Changing credentials or disconnecting invalidates them.
 - Read up to 100 messages per page, 500 items per preview, and select up to 100.
   Selected items are indexed together, keeping their context and original links.
 - **Loaded items** filters fetched content locally. **Search source** uses the
@@ -145,9 +184,8 @@ menu offers **Review selection** and **Remove from brain**.
   tombstone prevents accidental re-import; re-adding requires explicit confirmation.
 - This is a reviewed snapshot, not a mirror: upstream edits/deletions require
   another review. Source-channel permissions are not copied into the org dataset.
-- Credentials are operator-managed for one org/server per deployment in this
-  slice. Per-org OAuth connections, automatic sync, and durable job recovery are
-  separate follow-ups; do not use this as a production connector platform yet.
+- OAuth installations, automatic sync, audit history and durable job recovery
+  remain follow-ups; this is not a production connector platform yet.
 
 `SourceConnector` owns provider access, pagination and normalization. The shared
 import service owns preview sessions and selection; `CompanyBrainService` owns

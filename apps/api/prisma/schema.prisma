@@ -155,6 +155,8 @@ model Organization {
   notificationPreferences NotificationPreference[]
   projects                Project[]
   knowledgeSources        KnowledgeSource[]
+  sourceConnections       SourceConnection[]
+  sourceLocations         SourceLocation[]
   departments             Department[]
   departmentContacts      DepartmentContact[]
 
@@ -400,6 +402,55 @@ enum KnowledgeSourceStatus {
   FAILED
   UPDATING
   REMOVING
+}
+
+enum SourceConnectionStatus {
+  ACTIVE
+  DISCONNECTED
+}
+
+model SourceConnection {
+  id                  String                 @id @default(uuid())
+  organizationId      String                 @map("organization_id")
+  connectorId         String                 @map("connector_id")
+  name                String
+  externalAccountId   String                 @map("external_account_id")
+  accountName         String                 @map("account_name")
+  config              Json
+  encryptedCredential String?                @map("encrypted_credential")
+  status              SourceConnectionStatus @default(ACTIVE)
+  revision            Int                    @default(1)
+  lastVerifiedAt      DateTime               @map("last_verified_at") @db.Timestamptz(6)
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  locations    SourceLocation[]
+
+  @@unique([id, organizationId])
+  @@unique([organizationId, connectorId, externalAccountId])
+  @@map("source_connections")
+}
+
+model SourceLocation {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  connectionId   String    @map("connection_id")
+  externalId     String    @map("external_id")
+  locator        String
+  name           String
+  url            String
+  revision       Int       @default(1)
+  archivedAt     DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connection   SourceConnection @relation(fields: [connectionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@unique([connectionId, externalId])
+  @@index([organizationId, connectionId, archivedAt])
+  @@map("source_locations")
 }
 
 model KnowledgeSource {

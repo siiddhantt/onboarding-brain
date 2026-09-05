@@ -3,10 +3,8 @@ import {
   BadGatewayException,
   BadRequestException,
   ForbiddenException,
-  Inject,
   Injectable,
   NotFoundException,
-  ServiceUnavailableException,
 } from '@nestjs/common';
 import {
   MAX_SOURCE_PREVIEW_ITEMS,
@@ -24,14 +22,13 @@ import { CompanyBrainService } from '../company-brain/company-brain.service';
 import { readSelection } from '../company-brain/curated-source';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { RedisService } from '../redis/redis.service';
-import {
-  SOURCE_CONNECTORS,
-  SourceCollectionPage,
-  SourceConnector,
-} from './source-connector.interface';
+import { SourceCollectionPage } from './source-connector.interface';
+import { SourceConnectionsService } from './connections/source-connections.service';
 
 interface PreviewSession extends SourcePreview {
   excludedIds: string[];
+  connectionRevision: number;
+  locationRevision: number;
 }
 
 const isSafeUrl = (value: string): boolean => {
@@ -46,15 +43,14 @@ const isSafeUrl = (value: string): boolean => {
 @Injectable()
 export class SourceImportsService {
   constructor(
-    @Inject(SOURCE_CONNECTORS) private readonly connectors: readonly SourceConnector[],
+    private readonly connections: SourceConnectionsService,
     private readonly brain: CompanyBrainService,
     private readonly organizations: OrganizationsService,
     private readonly redis: RedisService,
   ) {}
 
   async listConnectors(userId: string, organizationId: string) {
-    await this.requireManager(userId, organizationId);
-    return this.connectors.map((connector) => connector.describe(organizationId));
+    return this.connections.listConnectors(userId, organizationId);
   }
 
   async preview(
@@ -63,23 +59,34 @@ export class SourceImportsService {
     request: PreviewSourceRequest,
   ): Promise<SourcePreview> {
     await this.requireManager(userId, organizationId);
-    const connector = this.connector(request.connectorId, organizationId);
+    const { connector, access, connection, location } = await this.connections.locationAccess(
+      userId,
+      organizationId,
+      request.locationId,
+    );
     const query = this.normalizeQuery(request.query);
-    if (Object.keys(query).length && !connector.describe(organizationId).search)
+    if (Object.keys(query).length && !connector.describe().search)
       throw new BadRequestException('This connector supports filtering loaded items only.');
     const previous = request.previewId
       ? await this.session(userId, organizationId, request.previewId)
       : null;
     if (
       previous &&
-      (previous.connectorId !== request.connectorId ||
-        previous.locator !== request.locator ||
+      (previous.locationId !== request.locationId ||
         (request.cursor &&
           (previous.nextCursor !== request.cursor ||
             JSON.stringify(previous.query ?? {}) !== JSON.stringify(query))))
     ) {
       throw new BadRequestException('This page does not belong to the current preview.');
     }
+    if (previous)
+      await this.connections.assertCurrent(
+        userId,
+        organizationId,
+        previous.locationId,
+        previous.connectionRevision,
+        previous.locationRevision,
+      );
     if (request.cursor && !previous)
       throw new BadRequestException('Load more items from an existing preview.');
     const remaining = MAX_SOURCE_PREVIEW_ITEMS - (previous?.items.length ?? 0);
@@ -87,12 +94,23 @@ export class SourceImportsService {
       throw new BadRequestException(
         'Preview limit reached. Save your selection, then start a new preview.',
       );
-    const page = await connector.readPage(organizationId, request.locator, {
+    const page = await connector.readPage(access, location.locator, {
       cursor: request.cursor,
       query,
       limit: Math.min(100, remaining),
     });
     this.validatePage(page);
+    if (page.externalId !== location.externalId)
+      throw new BadGatewayException(
+        'The saved location changed identity. Save it as a new location.',
+      );
+    await this.connections.assertCurrent(
+      userId,
+      organizationId,
+      location.id,
+      connection.revision,
+      location.revision,
+    );
     if (request.cursor && page.nextCursor === request.cursor)
       throw new BadGatewayException('The connector did not advance to another page.');
     if (page.items.length > Math.min(100, remaining))
@@ -120,9 +138,12 @@ export class SourceImportsService {
     );
     const session: PreviewSession = {
       id: randomUUID(),
+      locationId: location.id,
+      connectionRevision: connection.revision,
+      locationRevision: location.revision,
       connectorId: connector.id,
       externalId: page.externalId,
-      locator: request.locator,
+      locator: location.locator,
       name: page.name,
       url: page.url,
       items,
@@ -148,14 +169,25 @@ export class SourceImportsService {
       JSON.stringify(session),
       SOURCE_PREVIEW_TTL_SECONDS,
     );
-    const { excludedIds: _excludedIds, ...response } = session;
+    const {
+      excludedIds: _excludedIds,
+      connectionRevision: _connectionRevision,
+      locationRevision: _locationRevision,
+      ...response
+    } = session;
     return response;
   }
 
   async import(userId: string, organizationId: string, request: ImportSourceRequest) {
     await this.requireManager(userId, organizationId);
     const preview = await this.session(userId, organizationId, request.previewId);
-    this.connector(preview.connectorId, organizationId);
+    await this.connections.assertCurrent(
+      userId,
+      organizationId,
+      preview.locationId,
+      preview.connectionRevision,
+      preview.locationRevision,
+    );
     if (request.shareWithOrganization !== true)
       throw new BadRequestException('Confirm organization-wide sharing.');
     const selected = new Set(request.selectedIds);
@@ -190,16 +222,6 @@ export class SourceImportsService {
     });
   }
 
-  private connector(id: string, organizationId: string): SourceConnector {
-    const connector = this.connectors.find((item) => item.id === id);
-    if (!connector) throw new NotFoundException('Source connector not found.');
-    if (!connector.describe(organizationId).isConfigured)
-      throw new ServiceUnavailableException(
-        'This connector is not configured for the organization.',
-      );
-    return connector;
-  }
-
   private normalizeQuery(query?: SourcePreviewQuery): SourcePreviewQuery {
     if (query?.from && query.to && Date.parse(query.from) >= Date.parse(query.to))
       throw new BadRequestException('The start date must be before the end date.');
@@ -221,7 +243,12 @@ export class SourceImportsService {
         'This preview expired or is not accessible. Preview the source again.',
       );
     const session = JSON.parse(raw) as PreviewSession;
-    if (Date.parse(session.expiresAt) <= Date.now())
+    if (
+      !session.locationId ||
+      !session.connectionRevision ||
+      !session.locationRevision ||
+      Date.parse(session.expiresAt) <= Date.now()
+    )
       throw new NotFoundException('This preview expired. Preview the source again.');
     return session;
   }

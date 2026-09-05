@@ -26,13 +26,15 @@ export interface SourceConnectorDescriptor {
   locatorPlaceholder: string;
   emptyStateHint: string;
   isConfigured: boolean;
+  connectionFields: { key: string; label: string; placeholder: string }[];
+  credentialLabel: string;
+  canDiscoverLocations: boolean;
   /** Present only when the connector supports native text and date search. */
   search?: { dateField: 'createdAt' | 'updatedAt' };
 }
 
 export interface PreviewSourceRequest {
-  connectorId: string;
-  locator: string;
+  locationId: string;
   previewId?: string;
   cursor?: string;
   query?: SourcePreviewQuery;
@@ -40,6 +42,7 @@ export interface PreviewSourceRequest {
 
 export interface SourcePreview {
   id: string;
+  locationId: string;
   connectorId: string;
   externalId: string;
   locator: string;
@@ -56,6 +59,53 @@ export interface SourcePreview {
   query?: SourcePreviewQuery;
   resultIds?: string[];
   limitReached?: boolean;
+}
+
+/** Public connection data never contains credentials or encrypted credentials. */
+export interface SourceConnection {
+  id: string;
+  connectorId: string;
+  name: string;
+  accountName: string;
+  config: Record<string, string>;
+  status: 'ACTIVE' | 'DISCONNECTED';
+  revision: number;
+  lastVerifiedAt: string;
+  locations: SavedSourceLocation[];
+}
+
+export interface SourceLocation {
+  externalId: string;
+  name: string;
+  url: string;
+  locator: string;
+}
+
+export interface SavedSourceLocation extends SourceLocation {
+  id: string;
+  connectionId: string;
+}
+
+export interface CreateSourceConnectionRequest {
+  connectorId: string;
+  name: string;
+  config: Record<string, string>;
+  credential: string;
+}
+
+export interface UpdateSourceConnectionRequest {
+  name: string;
+  credential?: string;
+  expectedRevision: number;
+}
+
+export interface SourceConnectionRevisionRequest {
+  expectedRevision: number;
+}
+
+export interface SaveSourceLocationRequest {
+  locator: string;
+  expectedRevision: number;
 }
 
 export interface ImportSourceRequest {

@@ -24,7 +24,8 @@ knowledge the team can use.
 - **Ask** — questions in plain language, answers with sources, and a no-answer
   state when supporting evidence is missing.
 - **Knowledge** — upload documents or select messages from Discord channels and
-  public threads. Preview before sharing, then replace or remove sources as needed.
+  public threads. Save organization-owned connections and locations; preview
+  before sharing, then replace or remove sources as needed.
 - **Directory** — departments and contacts drawn from the organization's members.
 
 Each organization has its own Cognee dataset. Imported content is shared with
