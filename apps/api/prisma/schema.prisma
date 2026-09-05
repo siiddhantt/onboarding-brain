@@ -412,6 +412,11 @@ model KnowledgeSource {
   status                     KnowledgeSourceStatus @default(PROCESSING)
   providerReference          String?               @map("provider_reference")
   providerContainerReference String?               @map("provider_container_reference")
+  connectorId                String?               @map("connector_id")
+  externalId                 String?               @map("external_id")
+  sourceUrl                  String?               @map("source_url")
+  contentHash                String?               @map("content_hash")
+  selection                  Json?
   version                    Int                   @default(1)
   lastIndexedAt              DateTime?             @map("last_indexed_at") @db.Timestamptz(6)
   errorMessage               String?               @map("error_message")
@@ -425,6 +430,7 @@ model KnowledgeSource {
   @@index([organizationId, archivedAt, createdAt])
   @@index([organizationId, status])
   @@index([providerReference])
+  @@unique([organizationId, connectorId, externalId])
   @@map("knowledge_sources")
 }
 

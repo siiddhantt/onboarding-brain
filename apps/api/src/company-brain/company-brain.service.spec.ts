@@ -171,7 +171,7 @@ describe('CompanyBrainService', () => {
         },
       });
       expect(prisma.knowledgeSource.update).toHaveBeenCalledWith({
-        where: { id: 'source-1' },
+        where: { id: 'source-1', organizationId },
         data: {
           status: KnowledgeSourceStatus.READY,
           providerReference: 'document-1',
@@ -189,7 +189,7 @@ describe('CompanyBrainService', () => {
       const actual = await service.uploadDocument(userId, organizationId, buildFile());
 
       expect(prisma.knowledgeSource.update).toHaveBeenCalledWith({
-        where: { id: 'source-1' },
+        where: { id: 'source-1', organizationId },
         data: {
           status: KnowledgeSourceStatus.FAILED,
           errorMessage: 'The document could not be indexed. Try uploading it again.',
@@ -283,7 +283,7 @@ describe('CompanyBrainService', () => {
         },
       });
       expect(prisma.knowledgeSource.update).toHaveBeenCalledWith({
-        where: { id: 'source-1' },
+        where: { id: 'source-1', organizationId },
         data: expect.objectContaining({
           name: 'Employee handbook v2.pdf',
           status: KnowledgeSourceStatus.READY,
@@ -351,7 +351,7 @@ describe('CompanyBrainService', () => {
         prisma.knowledgeSource.update.mock.invocationCallOrder[0],
       );
       expect(prisma.knowledgeSource.update).toHaveBeenCalledWith({
-        where: { id: 'source-1' },
+        where: { id: 'source-1', organizationId },
         data: {
           status: KnowledgeSourceStatus.READY,
           archivedAt: expect.any(Date),

@@ -14,13 +14,14 @@ and contacts.
 - Organization-isolated Cognee datasets
 - PDF, DOCX, TXT, Markdown, and HTML ingestion
 - Source replacement and removal, with version and indexing status
+- Curated source imports: Discord text channels and public threads, with preview and selection
 - Grounded Q&A with citations and a no-answer state
 - Department and contact configuration
 - Cognee Cloud and embedded SDK adapters behind one provider-neutral interface
 
-This is a community prototype. Discord ingestion, expert handoff, and approval
-workflows are next steps. Indexing runs synchronously, and conversations are
-kept only in the current page session.
+This is a community prototype. Automatic syncing, Slack, expert handoff, and
+approval workflows are not implemented. Indexing runs synchronously, and
+conversations are kept only in the current page session.
 
 ## Stack
 
@@ -86,6 +87,12 @@ The API derives the dataset from the authenticated organization. Browser
 clients cannot select another dataset. See
 [`docs/integrations.md`](docs/integrations.md) for the embedded SDK option and
 integration details.
+
+For connected sources, follow the [Discord setup](docs/integrations.md#discord-curated-imports).
+Owners preview a channel or public thread in **Knowledge → Import from a connected
+source**, select relevant items, and confirm organization-wide sharing. Review
+the selection later to replace it; removing a source never deletes the original
+messages. Unchanged imports do not trigger another indexing call.
 
 ## Verify
 

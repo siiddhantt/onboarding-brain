@@ -3,7 +3,15 @@
 import { useRef, useState, type FormEvent } from 'react';
 import type { KnowledgeSource, KnowledgeSourceStatus } from '@app-starter/shared';
 import { KNOWLEDGE_DOCUMENT_MIME_TYPES, MAX_KNOWLEDGE_DOCUMENT_BYTES } from '@app-starter/shared';
-import { FileText, Loader2, MoreHorizontal, RefreshCw, Trash2, Upload } from 'lucide-react';
+import {
+  ExternalLink,
+  FileText,
+  Loader2,
+  MoreHorizontal,
+  RefreshCw,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,6 +71,7 @@ interface KnowledgeSourcesPanelProps {
   onUpload: (file: File) => Promise<void>;
   onReplace: (sourceId: string, file: File) => Promise<void>;
   onRemove: (sourceId: string) => Promise<void>;
+  onReview?: (source: KnowledgeSource) => void;
 }
 
 export function KnowledgeSourcesPanel({
@@ -75,6 +84,7 @@ export function KnowledgeSourcesPanel({
   onUpload,
   onReplace,
   onRemove,
+  onReview,
 }: KnowledgeSourcesPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const replacementInputs = useRef(new Map<string, HTMLInputElement>());
@@ -257,6 +267,17 @@ export function KnowledgeSourcesPanel({
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{source.name}</p>
+                        {source.origin && (
+                          <a
+                            href={source.origin.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:underline"
+                          >
+                            {source.origin.itemCount} curated items
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           Version {source.version} · {formatBytes(source.sizeBytes)} ·{' '}
                           {source.lastIndexedAt
@@ -289,24 +310,26 @@ export function KnowledgeSourcesPanel({
                       </Badge>
                       {canManage && (
                         <>
-                          <Input
-                            ref={(element) => {
-                              if (element) {
-                                replacementInputs.current.set(source.id, element);
-                              } else {
-                                replacementInputs.current.delete(source.id);
-                              }
-                            }}
-                            type="file"
-                            accept={KNOWLEDGE_DOCUMENT_MIME_TYPES.join(',')}
-                            aria-label={`Replacement document for ${source.name}`}
-                            className="sr-only"
-                            disabled={!isConfigured || BUSY_STATUSES.has(source.status)}
-                            onChange={(event) => {
-                              handleReplacementSelected(source, event.target.files?.[0]);
-                              event.target.value = '';
-                            }}
-                          />
+                          {!source.origin && (
+                            <Input
+                              ref={(element) => {
+                                if (element) {
+                                  replacementInputs.current.set(source.id, element);
+                                } else {
+                                  replacementInputs.current.delete(source.id);
+                                }
+                              }}
+                              type="file"
+                              accept={KNOWLEDGE_DOCUMENT_MIME_TYPES.join(',')}
+                              aria-label={`Replacement document for ${source.name}`}
+                              className="sr-only"
+                              disabled={!isConfigured || BUSY_STATUSES.has(source.status)}
+                              onChange={(event) => {
+                                handleReplacementSelected(source, event.target.files?.[0]);
+                                event.target.value = '';
+                              }}
+                            />
+                          )}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
@@ -330,10 +353,14 @@ export function KnowledgeSourcesPanel({
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
                                 disabled={!isConfigured}
-                                onSelect={() => replacementInputs.current.get(source.id)?.click()}
+                                onSelect={() =>
+                                  source.origin
+                                    ? onReview?.(source)
+                                    : replacementInputs.current.get(source.id)?.click()
+                                }
                               >
                                 <RefreshCw className="mr-2" />
-                                Replace document
+                                {source.origin ? 'Review selection' : 'Replace document'}
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"
@@ -384,7 +411,7 @@ export function KnowledgeSourcesPanel({
             <AlertDialogTitle>Remove this knowledge source?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingRemoval
-                ? `${pendingRemoval.name} and its derived knowledge will be removed from future answers. This cannot be undone.`
+                ? `${pendingRemoval.name} and its derived knowledge will be removed from future answers. Original content in connected services is not deleted.`
                 : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
