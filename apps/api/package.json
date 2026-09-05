@@ -51,7 +51,7 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
     "express": "^4.18.2",
-    "ioredis": "^5.8.2",
+    "ioredis": "^6.0.0",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.11",
     "passport": "^0.7.0",
