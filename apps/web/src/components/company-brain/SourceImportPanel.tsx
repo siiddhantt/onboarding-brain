@@ -10,6 +10,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { IconTile } from '@/components/ui/icon-tile';
+import { SourcePreviewBrowser } from './SourcePreviewBrowser';
 import { companyBrainApi } from '@/lib/company-brain-api';
 import { cn } from '@/lib/utils';
 
@@ -36,7 +45,6 @@ export const SourceImportPanel = ({
   const [locator, setLocator] = useState('');
   const [preview, setPreview] = useState<SourcePreview | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState('');
   const [canShare, setCanShare] = useState(false);
   const [canRestore, setCanRestore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,10 +101,6 @@ export const SourceImportPanel = ({
     onSettled: onImported,
   });
   const isBusy = previewMutation.isPending || importMutation.isPending;
-  const visibleItems =
-    preview?.items.filter((item) =>
-      `${item.title} ${item.text}`.toLowerCase().includes(search.toLowerCase()),
-    ) ?? [];
 
   const handleToggleItem = (id: string, checked: boolean) => {
     setSelectedIds((previous) => {
@@ -109,7 +113,7 @@ export const SourceImportPanel = ({
   };
 
   return (
-    <Card>
+    <Card className="w-full min-w-0">
       <button
         type="button"
         className="flex w-full items-center gap-3 rounded-xl p-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-6"
@@ -117,17 +121,22 @@ export const SourceImportPanel = ({
         aria-controls="source-import-content"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <Plug className="h-5 w-5 shrink-0 text-muted-foreground" />
+        <IconTile icon={Plug} />
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold">Import from a connected source</span>
           <span className="mt-1 block text-xs text-muted-foreground">
             Preview first. Only the items you choose become company knowledge.
           </span>
         </span>
-        <ChevronDown className={cn('h-4 w-4 transition-transform', isOpen && 'rotate-180')} />
+        <ChevronDown
+          className={cn(
+            'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+            isOpen && 'rotate-180',
+          )}
+        />
       </button>
       {isOpen && (
-        <CardContent id="source-import-content" className="space-y-4 border-t pt-5">
+        <CardContent id="source-import-content" className="min-w-0 space-y-4 border-t p-4 sm:p-6">
           {connectorsQuery.isLoading && (
             <p className="text-sm text-muted-foreground">Loading connectors…</p>
           )}
@@ -141,30 +150,32 @@ export const SourceImportPanel = ({
             onSubmit={(event) => {
               event.preventDefault();
               setError(null);
-              setSearch('');
               previewMutation.mutate({ connectorId: activeId, locator });
             }}
           >
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="source-connector">Source</Label>
-              <select
-                id="source-connector"
+              <Select
                 value={activeId}
                 disabled={isBusy}
-                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                onChange={(event) => {
-                  setConnectorId(event.target.value);
+                onValueChange={(value) => {
+                  setConnectorId(value);
                   setPreview(null);
                   setLocator('');
                   setError(null);
                 }}
               >
-                {connectorsQuery.data?.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="source-connector">
+                  <SelectValue placeholder="Choose a source" />
+                </SelectTrigger>
+                <SelectContent>
+                  {connectorsQuery.data?.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="min-w-0 space-y-2">
               <Label htmlFor="source-locator">{connector?.locatorLabel ?? 'Source location'}</Label>
@@ -201,15 +212,15 @@ export const SourceImportPanel = ({
             </p>
           )}
           {preview && (
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
                 <a
                   href={preview.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-w-0 items-center gap-2 break-words text-sm font-medium underline-offset-4 hover:underline"
+                  className="inline-flex min-w-0 max-w-full items-center gap-2 text-sm font-medium underline-offset-4 hover:underline"
                 >
-                  {preview.name}
+                  <span className="min-w-0 [overflow-wrap:anywhere]">{preview.name}</span>
                   <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                 </a>
                 <span className="text-xs text-muted-foreground" aria-live="polite">
@@ -227,99 +238,36 @@ export const SourceImportPanel = ({
                   This source was removed. Nothing is selected or restored automatically.
                 </p>
               )}
-              <Input
-                aria-label="Filter preview items"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Filter this preview…"
+              <SourcePreviewBrowser
+                key={preview.externalId}
+                preview={preview}
+                connector={connector}
+                selectedIds={selectedIds}
+                isBusy={isBusy}
+                onToggle={handleToggleItem}
+                onSearch={(query) =>
+                  previewMutation.mutate({
+                    connectorId: preview.connectorId,
+                    locator: preview.locator,
+                    previewId: preview.id,
+                    query,
+                  })
+                }
+                onLoadMore={() =>
+                  previewMutation.mutate({
+                    connectorId: preview.connectorId,
+                    locator: preview.locator,
+                    previewId: preview.id,
+                    cursor: preview.nextCursor!,
+                    query: preview.query,
+                  })
+                }
               />
-              <div
-                className="max-h-96 divide-y overflow-y-auto overscroll-contain rounded-lg border"
-                aria-label="Source preview items"
-              >
-                {visibleItems.length === 0 && (
-                  <p className="p-4 text-sm text-muted-foreground">
-                    No matching readable items. {connector?.emptyStateHint}
-                  </p>
-                )}
-                {visibleItems.map((item) => (
-                  <div key={item.id} className="flex items-start gap-3 p-3 sm:p-4">
-                    <input
-                      type="checkbox"
-                      id={`source-item-${item.id}`}
-                      className="mt-1 h-4 w-4 shrink-0 accent-primary"
-                      checked={selectedIds.has(item.id)}
-                      disabled={
-                        isBusy ||
-                        (!selectedIds.has(item.id) &&
-                          selectedIds.size >= MAX_SOURCE_SELECTION_ITEMS)
-                      }
-                      onChange={(event) => handleToggleItem(item.id, event.target.checked)}
-                      aria-label={`Include ${item.title}`}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <Label
-                        htmlFor={`source-item-${item.id}`}
-                        className="break-words text-xs font-medium"
-                      >
-                        {item.title}
-                      </Label>
-                      {preview.savedItemIds.includes(item.id) && (
-                        <span className="ml-2 text-[11px] text-muted-foreground">
-                          Saved snapshot
-                        </span>
-                      )}
-                      {item.text.length > 240 ? (
-                        <details className="mt-1.5 text-sm">
-                          <summary className="cursor-pointer list-none whitespace-pre-wrap break-words leading-6 [&::-webkit-details-marker]:hidden">
-                            {item.text.slice(0, 240)}… (expand)
-                          </summary>
-                          <p className="mt-2 whitespace-pre-wrap break-words leading-6 text-muted-foreground">
-                            {item.text}
-                          </p>
-                        </details>
-                      ) : (
-                        <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-6">
-                          {item.text}
-                        </p>
-                      )}
-                      <a
-                        href={item.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:underline"
-                      >
-                        Open original
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
               {preview.savedItemIds.length > 0 && (
                 <p className="text-xs leading-5 text-muted-foreground">
-                  Saved snapshots are previously selected items outside the fetched pages. They are
-                  kept unless you uncheck them; this import does not automatically detect upstream
-                  deletions.
+                  Saved snapshots are previously selected items outside the fetched results. They
+                  stay unless you uncheck them. Missing from a preview does not mean deleted.
                 </p>
-              )}
-              {preview.nextCursor && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={isBusy}
-                  onClick={() =>
-                    previewMutation.mutate({
-                      connectorId: preview.connectorId,
-                      locator: preview.locator,
-                      previewId: preview.id,
-                      cursor: preview.nextCursor!,
-                    })
-                  }
-                >
-                  Load older items
-                </Button>
               )}
               <div className="space-y-3 rounded-lg bg-muted/40 p-3 text-xs leading-5">
                 <label className="flex items-start gap-2">

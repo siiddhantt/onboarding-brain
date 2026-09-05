@@ -18,7 +18,7 @@ export function PageContainer({ children, className, variant = 'form' }: PageCon
   };
 
   return (
-    <div className={cn('container mx-auto px-4 py-8', maxWidth[variant], className)}>
+    <div className={cn('container mx-auto min-w-0 px-4 py-8', maxWidth[variant], className)}>
       {children}
     </div>
   );

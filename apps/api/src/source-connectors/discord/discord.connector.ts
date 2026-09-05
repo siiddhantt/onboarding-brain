@@ -9,7 +9,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { SourceConnectorDescriptor, SourceRecord } from '@app-starter/shared';
-import type { SourceCollectionPage, SourceConnector } from '../source-connector.interface';
+import type {
+  SourceCollectionPage,
+  SourceConnector,
+  SourcePageOptions,
+} from '../source-connector.interface';
+import { discordSearchPage, discordSearchParams } from './discord-search';
 
 const SNOWFLAKE = /^\d{17,20}$/;
 const PAGE_SIZE = 100;
@@ -34,6 +39,7 @@ export class DiscordConnector implements SourceConnector {
     return {
       id: this.id,
       name: 'Discord',
+      search: { dateField: 'createdAt' },
       locatorLabel: 'Channel or public thread ID',
       locatorPlaceholder: 'Paste a channel ID or Discord channel link',
       emptyStateHint:
@@ -50,14 +56,17 @@ export class DiscordConnector implements SourceConnector {
   async readPage(
     organizationId: string,
     locator: string,
-    cursor?: string,
+    options: SourcePageOptions = {},
   ): Promise<SourceCollectionPage> {
+    const { cursor, query = {} } = options;
+    const isSearch = Boolean(query.text || query.from || query.to);
     if (!this.describe(organizationId).isConfigured) {
       throw new ServiceUnavailableException('Discord is not configured for this organization.');
     }
     const guildId = this.config.get<string>('DISCORD_GUILD_ID')!;
     const channelId = this.channelId(locator, guildId);
-    if (cursor && !SNOWFLAKE.test(cursor)) throw new BadRequestException('Invalid Discord cursor.');
+    if (cursor && !isSearch && !SNOWFLAKE.test(cursor))
+      throw new BadRequestException('Invalid Discord cursor.');
 
     const channel = object(await this.get(`/channels/${channelId}`));
     const parentId = typeof channel.parent_id === 'string' ? channel.parent_id : null;
@@ -72,20 +81,39 @@ export class DiscordConnector implements SourceConnector {
       throw new ForbiddenException('This channel is not in the organization’s import allowlist.');
     }
 
-    const raw = await this.get(
-      `/channels/${channelId}/messages?limit=${PAGE_SIZE}${cursor ? `&before=${cursor}` : ''}`,
+    const includeStarter =
+      isThread && parentId && !cursor && !isSearch && (options.limit ?? PAGE_SIZE) > 1;
+    const pageSize = Math.max(
+      1,
+      Math.min(PAGE_SIZE, options.limit ?? PAGE_SIZE) - (includeStarter ? 1 : 0),
     );
+    let raw: unknown;
+    let nextCursor: string | null;
+    if (isSearch) {
+      const { params, offset, limit } = discordSearchParams(channelId, options);
+      const result = discordSearchPage(
+        await this.get(`/guilds/${guildId}/messages/search?${params}`),
+        offset,
+        limit,
+      );
+      raw = result.messages;
+      nextCursor = result.nextCursor;
+    } else {
+      raw = await this.get(
+        `/channels/${channelId}/messages?limit=${pageSize}${cursor ? `&before=${cursor}` : ''}`,
+      );
+      nextCursor =
+        Array.isArray(raw) && raw.length === pageSize && typeof raw.at(-1)?.id === 'string'
+          ? String(raw.at(-1)!.id)
+          : null;
+    }
     if (!Array.isArray(raw) || raw.length > PAGE_SIZE)
       throw new BadGatewayException('Discord returned an unreadable message list.');
     const messages = raw.map(object);
-    const nextCursor =
-      messages.length === PAGE_SIZE && typeof messages.at(-1)?.id === 'string'
-        ? String(messages.at(-1)!.id)
-        : null;
 
     // A public thread's starter may live in its parent channel. It is offered for
     // selection, never silently added to the imported conversation.
-    if (isThread && parentId && !cursor) {
+    if (includeStarter) {
       const parent = object(await this.get(`/channels/${parentId}`));
       if (parent.type === 0 || parent.type === 5) {
         const starter = await this.get(`/channels/${parentId}/messages/${channelId}`, true);
@@ -102,7 +130,7 @@ export class DiscordConnector implements SourceConnector {
         !SNOWFLAKE.test(message.id) ||
         typeof message.channel_id !== 'string' ||
         !SNOWFLAKE.test(message.channel_id) ||
-        ![channelId, parentId].includes(message.channel_id)
+        !(includeStarter ? [channelId, parentId] : [channelId]).includes(message.channel_id)
       ) {
         throw new BadGatewayException('Discord returned an invalid message identity.');
       }
@@ -112,6 +140,11 @@ export class DiscordConnector implements SourceConnector {
       if (!Number.isFinite(Date.parse(timestamp)) || !Number.isFinite(Date.parse(updatedAt))) {
         throw new BadGatewayException('Discord returned an invalid message timestamp.');
       }
+      if (
+        (query.from && Date.parse(timestamp) < Date.parse(query.from)) ||
+        (query.to && Date.parse(timestamp) >= Date.parse(query.to))
+      )
+        return [];
       const authorName = String(author.global_name || author.username || 'Unknown author').slice(
         0,
         100,
@@ -122,6 +155,7 @@ export class DiscordConnector implements SourceConnector {
           title: `${authorName} · ${new Date(timestamp).toISOString()}`,
           text: message.content.trim(),
           url: `https://discord.com/channels/${guildId}/${message.channel_id}/${message.id}`,
+          createdAt: new Date(timestamp).toISOString(),
           updatedAt: new Date(updatedAt).toISOString(),
         },
       ];
@@ -178,6 +212,10 @@ export class DiscordConnector implements SourceConnector {
         if (allowMissing) return null;
         throw new NotFoundException('Discord channel not found or not accessible to the bot.');
       }
+      if (response.status === 202)
+        throw new ServiceUnavailableException(
+          'Discord is preparing its search index. Try searching again shortly; your selection is unchanged.',
+        );
       if (!response.ok)
         throw new ServiceUnavailableException('Discord is unavailable. Try again later.');
       return await response.json();

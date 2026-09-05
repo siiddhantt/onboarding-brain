@@ -130,6 +130,12 @@ menu offers **Review selection** and **Remove from brain**.
   user and organization and expire from Redis after 15 minutes.
 - Read up to 100 messages per page, 500 items per preview, and select up to 100.
   Selected items are indexed together, keeping their context and original links.
+- **Loaded items** filters fetched content locally. **Search source** uses the
+  connector's native search within the chosen collection (Discord: 25 results
+  per page). Date bounds use the curator's local days; Discord filters creation
+  time, not edit time. Selected items stay visible across searches and page loads.
+  Search indexing delays and rate limits are errors to retry, not empty results.
+  Native results reflect the provider's search index, which can lag recent messages.
 - PostgreSQL stores only selected text and excluded item IDs, not unselected
   chatter. Existing selections stay checked; new items stay unchecked. Previously
   selected items outside fetched pages are marked **Saved snapshot**.
@@ -148,6 +154,9 @@ import service owns preview sessions and selection; `CompanyBrainService` owns
 identity and indexing through `KnowledgeEngine`. A Slack or document-service
 adapter can reuse these paths without adding Slack fields to the knowledge engine.
 Provider-specific authorization still needs an explicit implementation.
+Adapters advertise native search support and its date field; they translate
+plain text/date bounds and own opaque cursors. Without that capability the same
+preview offers loaded-item filtering. A preview is bounded, not a full search index.
 
 References: [Discord bot setup](https://docs.discord.com/developers/quick-start/getting-started),
 [message access](https://docs.discord.com/developers/resources/message#get-channel-messages),

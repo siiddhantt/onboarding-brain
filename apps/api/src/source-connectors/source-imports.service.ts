@@ -13,7 +13,12 @@ import {
   MAX_SOURCE_SELECTION_ITEMS,
   SOURCE_PREVIEW_TTL_SECONDS,
 } from '@app-starter/shared';
-import type { ImportSourceRequest, PreviewSourceRequest, SourcePreview } from '@app-starter/shared';
+import type {
+  ImportSourceRequest,
+  PreviewSourceRequest,
+  SourcePreview,
+  SourcePreviewQuery,
+} from '@app-starter/shared';
 import { OrgRole } from '@prisma/client';
 import { CompanyBrainService } from '../company-brain/company-brain.service';
 import { readSelection } from '../company-brain/curated-source';
@@ -59,6 +64,9 @@ export class SourceImportsService {
   ): Promise<SourcePreview> {
     await this.requireManager(userId, organizationId);
     const connector = this.connector(request.connectorId, organizationId);
+    const query = this.normalizeQuery(request.query);
+    if (Object.keys(query).length && !connector.describe(organizationId).search)
+      throw new BadRequestException('This connector supports filtering loaded items only.');
     const previous = request.previewId
       ? await this.session(userId, organizationId, request.previewId)
       : null;
@@ -66,14 +74,29 @@ export class SourceImportsService {
       previous &&
       (previous.connectorId !== request.connectorId ||
         previous.locator !== request.locator ||
-        previous.nextCursor !== request.cursor)
+        (request.cursor &&
+          (previous.nextCursor !== request.cursor ||
+            JSON.stringify(previous.query ?? {}) !== JSON.stringify(query))))
     ) {
       throw new BadRequestException('This page does not belong to the current preview.');
     }
-    if (Boolean(request.cursor) !== Boolean(previous))
-      throw new BadRequestException('Load older items from an existing preview.');
-    const page = await connector.readPage(organizationId, request.locator, request.cursor);
+    if (request.cursor && !previous)
+      throw new BadRequestException('Load more items from an existing preview.');
+    const remaining = MAX_SOURCE_PREVIEW_ITEMS - (previous?.items.length ?? 0);
+    if (!remaining)
+      throw new BadRequestException(
+        'Preview limit reached. Save your selection, then start a new preview.',
+      );
+    const page = await connector.readPage(organizationId, request.locator, {
+      cursor: request.cursor,
+      query,
+      limit: Math.min(100, remaining),
+    });
     this.validatePage(page);
+    if (request.cursor && page.nextCursor === request.cursor)
+      throw new BadGatewayException('The connector did not advance to another page.');
+    if (page.items.length > Math.min(100, remaining))
+      throw new BadGatewayException('The connector exceeded the requested page size.');
     if (previous && previous.externalId !== page.externalId)
       throw new BadGatewayException('The connector changed source identity between pages.');
 
@@ -111,6 +134,14 @@ export class SourceImportsService {
       excludedIds: previous?.excludedIds ?? selection.excludedIds,
       nextCursor: items.length < MAX_SOURCE_PREVIEW_ITEMS ? page.nextCursor : null,
       expiresAt: new Date(Date.now() + SOURCE_PREVIEW_TTL_SECONDS * 1000).toISOString(),
+      query,
+      resultIds: [
+        ...new Set([
+          ...(request.cursor ? (previous?.resultIds ?? []) : []),
+          ...page.items.map((item) => item.id),
+        ]),
+      ],
+      limitReached: items.length >= MAX_SOURCE_PREVIEW_ITEMS,
     };
     await this.redis.set(
       this.key(userId, organizationId, session.id),
@@ -169,6 +200,16 @@ export class SourceImportsService {
     return connector;
   }
 
+  private normalizeQuery(query?: SourcePreviewQuery): SourcePreviewQuery {
+    if (query?.from && query.to && Date.parse(query.from) >= Date.parse(query.to))
+      throw new BadRequestException('The start date must be before the end date.');
+    return {
+      ...(query?.text?.trim() ? { text: query.text.trim() } : {}),
+      ...(query?.from ? { from: new Date(query.from).toISOString() } : {}),
+      ...(query?.to ? { to: new Date(query.to).toISOString() } : {}),
+    };
+  }
+
   private async session(
     userId: string,
     organizationId: string,
@@ -217,7 +258,8 @@ export class SourceImportsService {
         !item.text.trim() ||
         item.text.length > 100_000 ||
         !isSafeUrl(item.url) ||
-        !Number.isFinite(Date.parse(item.updatedAt))
+        !Number.isFinite(Date.parse(item.updatedAt)) ||
+        (item.createdAt !== undefined && !Number.isFinite(Date.parse(item.createdAt)))
       ) {
         throw new BadGatewayException('The connector returned invalid source content.');
       }

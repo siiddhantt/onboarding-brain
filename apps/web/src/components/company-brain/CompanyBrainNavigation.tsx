@@ -20,7 +20,7 @@ export function CompanyBrainNavigation({ organizationId }: CompanyBrainNavigatio
 
   return (
     <nav aria-label="Company brain" className="border-b">
-      <div className="flex min-w-0 gap-6 overflow-x-auto">
+      <div className="flex min-w-0 gap-3 overflow-x-auto sm:gap-6">
         {items.map((item) => {
           const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
           const Icon = item.icon;

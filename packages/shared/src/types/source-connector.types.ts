@@ -8,7 +8,15 @@ export interface SourceRecord {
   title: string;
   text: string;
   url: string;
+  createdAt?: string;
   updatedAt: string;
+}
+
+/** UTC instants; from is inclusive, to is exclusive. Provider syntax stays in adapters. */
+export interface SourcePreviewQuery {
+  text?: string;
+  from?: string;
+  to?: string;
 }
 
 export interface SourceConnectorDescriptor {
@@ -18,6 +26,8 @@ export interface SourceConnectorDescriptor {
   locatorPlaceholder: string;
   emptyStateHint: string;
   isConfigured: boolean;
+  /** Present only when the connector supports native text and date search. */
+  search?: { dateField: 'createdAt' | 'updatedAt' };
 }
 
 export interface PreviewSourceRequest {
@@ -25,6 +35,7 @@ export interface PreviewSourceRequest {
   locator: string;
   previewId?: string;
   cursor?: string;
+  query?: SourcePreviewQuery;
 }
 
 export interface SourcePreview {
@@ -42,6 +53,9 @@ export interface SourcePreview {
   wasRemoved: boolean;
   nextCursor: string | null;
   expiresAt: string;
+  query?: SourcePreviewQuery;
+  resultIds?: string[];
+  limitReached?: boolean;
 }
 
 export interface ImportSourceRequest {

@@ -37,6 +37,7 @@ describe('Curated source imports (e2e)', () => {
       locatorPlaceholder: '',
       emptyStateHint: '',
       isConfigured: true,
+      search: { dateField: 'updatedAt' },
     }),
     readPage: jest.fn(async () => ({
       externalId: 'workspace/collection',
@@ -49,7 +50,7 @@ describe('Curated source imports (e2e)', () => {
   const secondConnector: SourceConnector = {
     ...connector,
     id: 'second-fixture',
-    describe: (org) => ({ ...connector.describe(org), id: 'second-fixture' }),
+    describe: (org) => ({ ...connector.describe(org), id: 'second-fixture', search: undefined }),
   };
   let sequence = 0;
   const engine: jest.Mocked<KnowledgeEngine> = {
@@ -315,5 +316,103 @@ describe('Curated source imports (e2e)', () => {
 
     jest.mocked(connector.readPage).mockResolvedValueOnce({ ...page, url: 'javascript:alert(1)' });
     await post('imports/preview', { connectorId: 'fixture', locator: 'collection' }).expect(502);
+  });
+
+  it('keeps the selection basket across native queries but binds each cursor to its query', async () => {
+    const first = await preview();
+    const input = { connectorId: 'fixture', locator: 'collection', previewId: first.id };
+    const calls = jest.mocked(connector.readPage).mock.calls.length;
+    await post('imports/preview', { ...input, query: { from: 'not-a-date' } }).expect(400);
+    await post('imports/preview', {
+      ...input,
+      query: { from: '2026-09-06', to: '2026-09-05' },
+    }).expect(400);
+    await post('imports/preview', {
+      connectorId: 'second-fixture',
+      locator: 'collection',
+      query: { text: 'coffee' },
+    }).expect(400);
+    expect(connector.readPage).toHaveBeenCalledTimes(calls);
+    const query = { text: 'coffee' };
+    const page = {
+      externalId: first.externalId,
+      name: first.name,
+      url: first.url,
+      items: [record('coffee-match', 'Coffee guide')],
+      nextCursor: 'next-result',
+    };
+    jest.mocked(connector.readPage).mockResolvedValueOnce(page);
+    const searched = (await post('imports/preview', { ...input, query }).expect(200)).body;
+    previewKeys.push(`source-preview:${organizationId}:${userId}:${searched.id}`);
+    expect(searched.items).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'policy' })]),
+    );
+    expect(searched.selectedIds).toEqual(['policy']);
+    expect(searched.resultIds).toEqual(['coffee-match']);
+    await post('imports/preview', {
+      ...input,
+      previewId: searched.id,
+      cursor: 'next-result',
+      query: { text: 'different' },
+    }).expect(400);
+    jest
+      .mocked(connector.readPage)
+      .mockResolvedValueOnce({
+        ...page,
+        items: [record('match-2', 'Another coffee guide')],
+        nextCursor: null,
+      });
+    const next = (
+      await post('imports/preview', {
+        ...input,
+        previewId: searched.id,
+        cursor: 'next-result',
+        query,
+      }).expect(200)
+    ).body;
+    previewKeys.push(`source-preview:${organizationId}:${userId}:${next.id}`);
+    expect(next.resultIds).toEqual(['coffee-match', 'match-2']);
+    expect(next.items).toHaveLength(new Set(next.items.map((item: SourceRecord) => item.id)).size);
+    await importSelection(next, ['policy']).expect(200);
+  });
+
+  it('bounds incremental previews without fetching beyond the cap or losing saved items', async () => {
+    let snapshot: SourcePreview | undefined;
+    for (let page = 0; page < 5; page++) {
+      const count = page === 4 ? 99 : 100;
+      jest.mocked(connector.readPage).mockResolvedValueOnce({
+        externalId: 'workspace/collection',
+        name: 'Bounded preview',
+        url: 'https://knowledge.example.com/collection',
+        items: Array.from({ length: count }, (_, index) =>
+          record(`page-${page}-${index}`, 'Preview content'),
+        ),
+        nextCursor: `page-${page + 1}`,
+      });
+      const response = await post('imports/preview', {
+        connectorId: 'fixture',
+        locator: 'collection',
+        ...(snapshot ? { previewId: snapshot.id, cursor: snapshot.nextCursor } : {}),
+      }).expect(200);
+      snapshot = response.body;
+      previewKeys.push(`source-preview:${organizationId}:${userId}:${snapshot!.id}`);
+    }
+    expect(snapshot!.items).toHaveLength(500);
+    expect(snapshot!.selectedIds).toEqual(['policy']);
+    expect(snapshot!.limitReached).toBe(true);
+    expect(snapshot!.nextCursor).toBeNull();
+    expect(connector.readPage).toHaveBeenLastCalledWith(
+      organizationId,
+      'collection',
+      expect.objectContaining({ limit: 99 }),
+    );
+    const calls = jest.mocked(connector.readPage).mock.calls.length;
+    await post('imports/preview', {
+      connectorId: 'fixture',
+      locator: 'collection',
+      previewId: snapshot!.id,
+      query: { text: 'more' },
+    }).expect(400);
+    expect(connector.readPage).toHaveBeenCalledTimes(calls);
   });
 });
