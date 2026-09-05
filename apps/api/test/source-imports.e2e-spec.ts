@@ -1,5 +1,6 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ForbiddenException, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { OrgRole } from '@prisma/client';
 import request from 'supertest';
 import type { SourcePreview, SourceRecord } from '@app-starter/shared';
@@ -14,6 +15,7 @@ import {
 } from '../src/source-connectors/source-connector.interface';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
+import { ConnectionCredentials } from '../src/source-connectors/connections/connection-credentials.service';
 
 describe('Curated source imports (e2e)', () => {
   const record = (id: string, text: string): SourceRecord => ({
@@ -37,8 +39,22 @@ describe('Curated source imports (e2e)', () => {
       locatorPlaceholder: '',
       emptyStateHint: '',
       isConfigured: true,
+      connectionFields: [],
+      credentialLabel: 'Token',
+      canDiscoverLocations: false,
       search: { dateField: 'updatedAt' },
     }),
+    verify: jest.fn(async () => ({
+      externalAccountId: 'workspace',
+      accountName: 'Team workspace',
+      config: { workspace: 'team' },
+    })),
+    resolveLocation: jest.fn(async () => ({
+      externalId: 'workspace/collection',
+      locator: 'collection',
+      name: 'Expense policy',
+      url: 'https://knowledge.example.com/collection',
+    })),
     readPage: jest.fn(async () => ({
       externalId: 'workspace/collection',
       name: 'Expense policy',
@@ -50,7 +66,7 @@ describe('Curated source imports (e2e)', () => {
   const secondConnector: SourceConnector = {
     ...connector,
     id: 'second-fixture',
-    describe: (org) => ({ ...connector.describe(org), id: 'second-fixture', search: undefined }),
+    describe: () => ({ ...connector.describe(), id: 'second-fixture', search: undefined }),
   };
   let sequence = 0;
   const engine: jest.Mocked<KnowledgeEngine> = {
@@ -73,6 +89,9 @@ describe('Curated source imports (e2e)', () => {
   let userId: string;
   let organizationId: string;
   let otherOrganizationId: string;
+  let connectionId: string;
+  let locationId: string;
+  let secondLocationId: string;
   const previewKeys: string[] = [];
   const api = (path: string) => `/api/organizations/${organizationId}/brain/${path}`;
   const post = (path: string, data: unknown) =>
@@ -82,8 +101,7 @@ describe('Curated source imports (e2e)', () => {
       .send(data as object);
   const preview = async (): Promise<SourcePreview> => {
     const response = await post('imports/preview', {
-      connectorId: 'fixture',
-      locator: 'collection',
+      locationId,
     }).expect(200);
     previewKeys.push(`source-preview:${organizationId}:${userId}:${response.body.id}`);
     return response.body;
@@ -106,11 +124,19 @@ describe('Curated source imports (e2e)', () => {
       .useValue(engine)
       .overrideProvider(SOURCE_CONNECTORS)
       .useValue([connector, secondConnector])
+      .overrideProvider(ConnectionCredentials)
+      .useValue(
+        new ConnectionCredentials(
+          new ConfigService({ SOURCE_CREDENTIALS_ENCRYPTION_KEY: 'ab'.repeat(32) }),
+        ),
+      )
       .compile();
     app = module.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     app.setGlobalPrefix('api');
-    await app.init();
+    // Keep one server open: repeatedly binding ephemeral listeners can reuse stale
+    // keep-alive sockets under Node 24 and obscure request assertions with parse errors.
+    await app.listen(0, '127.0.0.1');
     prisma = module.get(PrismaService);
     redis = module.get(RedisService);
     const signup = await request(app.getHttpServer())
@@ -132,6 +158,22 @@ describe('Curated source imports (e2e)', () => {
         .expect(201);
       if (!organizationId) organizationId = response.body.id;
       else otherOrganizationId = response.body.id;
+    }
+    for (const provider of ['fixture', 'second-fixture']) {
+      const connected = await post('connections', {
+        connectorId: provider,
+        name: 'Team source',
+        config: { workspace: 'team' },
+        credential: 'test-credential',
+      }).expect(201);
+      const saved = await post(`connections/${connected.body.id}/locations`, {
+        locator: 'collection',
+        expectedRevision: 1,
+      }).expect(201);
+      if (provider === 'fixture') {
+        connectionId = connected.body.id;
+        locationId = saved.body.id;
+      } else secondLocationId = saved.body.id;
     }
   });
   afterAll(async () => {
@@ -246,7 +288,7 @@ describe('Curated source imports (e2e)', () => {
       where: { userId_organizationId: { userId, organizationId } },
       data: { role: OrgRole.MEMBER },
     });
-    await post('imports/preview', { connectorId: 'fixture', locator: 'collection' }).expect(403);
+    await post('imports/preview', { locationId }).expect(403);
     await importSelection(snapshot, ['policy']).expect(403);
     expect(connector.readPage).toHaveBeenCalledTimes(calls);
     await request(app.getHttpServer())
@@ -267,8 +309,7 @@ describe('Curated source imports (e2e)', () => {
     await importSelection(snapshot, ['policy']).expect(404);
 
     const second = await post('imports/preview', {
-      connectorId: 'second-fixture',
-      locator: 'collection',
+      locationId: secondLocationId,
     }).expect(200);
     previewKeys.push(`source-preview:${organizationId}:${userId}:${second.body.id}`);
     await importSelection(second.body, ['receipts'])
@@ -294,7 +335,7 @@ describe('Curated source imports (e2e)', () => {
     expect(first.selectedIds).toEqual(['policy']);
     expect(first.savedItemIds).toEqual(['policy']);
     const calls = jest.mocked(connector.readPage).mock.calls.length;
-    const input = { connectorId: 'fixture', locator: 'collection', previewId: first.id };
+    const input = { locationId, previewId: first.id };
     await post('imports/preview', { ...input, cursor: 'forged' }).expect(400);
     expect(connector.readPage).toHaveBeenCalledTimes(calls);
 
@@ -315,12 +356,12 @@ describe('Curated source imports (e2e)', () => {
     );
 
     jest.mocked(connector.readPage).mockResolvedValueOnce({ ...page, url: 'javascript:alert(1)' });
-    await post('imports/preview', { connectorId: 'fixture', locator: 'collection' }).expect(502);
+    await post('imports/preview', { locationId }).expect(502);
   });
 
   it('keeps the selection basket across native queries but binds each cursor to its query', async () => {
     const first = await preview();
-    const input = { connectorId: 'fixture', locator: 'collection', previewId: first.id };
+    const input = { locationId, previewId: first.id };
     const calls = jest.mocked(connector.readPage).mock.calls.length;
     await post('imports/preview', { ...input, query: { from: 'not-a-date' } }).expect(400);
     await post('imports/preview', {
@@ -328,8 +369,7 @@ describe('Curated source imports (e2e)', () => {
       query: { from: '2026-09-06', to: '2026-09-05' },
     }).expect(400);
     await post('imports/preview', {
-      connectorId: 'second-fixture',
-      locator: 'collection',
+      locationId: secondLocationId,
       query: { text: 'coffee' },
     }).expect(400);
     expect(connector.readPage).toHaveBeenCalledTimes(calls);
@@ -355,13 +395,11 @@ describe('Curated source imports (e2e)', () => {
       cursor: 'next-result',
       query: { text: 'different' },
     }).expect(400);
-    jest
-      .mocked(connector.readPage)
-      .mockResolvedValueOnce({
-        ...page,
-        items: [record('match-2', 'Another coffee guide')],
-        nextCursor: null,
-      });
+    jest.mocked(connector.readPage).mockResolvedValueOnce({
+      ...page,
+      items: [record('match-2', 'Another coffee guide')],
+      nextCursor: null,
+    });
     const next = (
       await post('imports/preview', {
         ...input,
@@ -390,8 +428,7 @@ describe('Curated source imports (e2e)', () => {
         nextCursor: `page-${page + 1}`,
       });
       const response = await post('imports/preview', {
-        connectorId: 'fixture',
-        locator: 'collection',
+        locationId,
         ...(snapshot ? { previewId: snapshot.id, cursor: snapshot.nextCursor } : {}),
       }).expect(200);
       snapshot = response.body;
@@ -402,17 +439,250 @@ describe('Curated source imports (e2e)', () => {
     expect(snapshot!.limitReached).toBe(true);
     expect(snapshot!.nextCursor).toBeNull();
     expect(connector.readPage).toHaveBeenLastCalledWith(
-      organizationId,
+      { config: { workspace: 'team' }, credential: 'test-credential' },
       'collection',
       expect.objectContaining({ limit: 99 }),
     );
     const calls = jest.mocked(connector.readPage).mock.calls.length;
     await post('imports/preview', {
-      connectorId: 'fixture',
-      locator: 'collection',
+      locationId,
       previewId: snapshot!.id,
       query: { text: 'more' },
     }).expect(400);
     expect(connector.readPage).toHaveBeenCalledTimes(calls);
+  });
+
+  it('keeps connection credentials write-only and rejects cross-tenant IDs even for an owner of both organizations', async () => {
+    const listed = await request(app.getHttpServer())
+      .get(api('connections'))
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(listed.body.find((item: { id: string }) => item.id === connectionId)).toMatchObject({
+      status: 'ACTIVE',
+      locations: [{ id: locationId }],
+    });
+    expect(JSON.stringify(listed.body)).not.toMatch(/credential|test-credential/i);
+    const stored = await prisma.sourceConnection.findFirstOrThrow({
+      where: { id: connectionId, organizationId },
+    });
+    expect(stored.encryptedCredential).not.toContain('test-credential');
+    expect(stored.config).toEqual({ workspace: 'team' });
+    const otherApi = `/api/organizations/${otherOrganizationId}/brain`;
+    await request(app.getHttpServer())
+      .get(`${otherApi}/connections`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200, []);
+    await request(app.getHttpServer())
+      .get(`${otherApi}/connections/${connectionId}/discover`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+    await request(app.getHttpServer())
+      .patch(`${otherApi}/connections/${connectionId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Forged', credential: 'forged', expectedRevision: 1 })
+      .expect(404);
+    for (const [path, data] of [
+      [`connections/${connectionId}/disconnect`, { expectedRevision: 1 }],
+      [`connections/${connectionId}/locations`, { locator: 'collection', expectedRevision: 1 }],
+      ['imports/preview', { locationId }],
+    ] as const)
+      await request(app.getHttpServer())
+        .post(`${otherApi}/${path}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(data)
+        .expect(404);
+    await request(app.getHttpServer())
+      .delete(`${otherApi}/locations/${locationId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+    await expect(
+      prisma.sourceLocation.create({
+        data: {
+          organizationId: otherOrganizationId,
+          connectionId,
+          externalId: 'forged',
+          name: 'Forged',
+          locator: 'forged',
+          url: 'https://example.com',
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'P2003' });
+    const secondTenant = await request(app.getHttpServer())
+      .post(`${otherApi}/connections`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        connectorId: 'fixture',
+        name: 'Other team',
+        config: {},
+        credential: 'other-team-token',
+      })
+      .expect(201);
+    expect(secondTenant.body.id).not.toBe(connectionId);
+  });
+
+  it('rejects every connection management action from an ordinary member', async () => {
+    await prisma.organizationMember.update({
+      where: { userId_organizationId: { userId, organizationId } },
+      data: { role: OrgRole.MEMBER },
+    });
+    const verifications = jest.mocked(connector.verify).mock.calls.length;
+    await request(app.getHttpServer())
+      .get(api('connections'))
+      .set('Authorization', `Bearer ${token}`)
+      .expect(403);
+    await post('connections', {
+      connectorId: 'fixture',
+      name: 'Unauthorized',
+      config: {},
+      credential: 'secret',
+    }).expect(403);
+    await request(app.getHttpServer())
+      .patch(api(`connections/${connectionId}`))
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Unauthorized', expectedRevision: 1 })
+      .expect(403);
+    await post(`connections/${connectionId}/disconnect`, { expectedRevision: 1 }).expect(403);
+    await post(`connections/${connectionId}/locations`, {
+      locator: 'collection',
+      expectedRevision: 1,
+    }).expect(403);
+    await request(app.getHttpServer())
+      .get(api(`connections/${connectionId}/discover`))
+      .set('Authorization', `Bearer ${token}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .delete(api(`locations/${locationId}`))
+      .set('Authorization', `Bearer ${token}`)
+      .expect(403);
+    expect(connector.verify).toHaveBeenCalledTimes(verifications);
+    await prisma.organizationMember.update({
+      where: { userId_organizationId: { userId, organizationId } },
+      data: { role: OrgRole.OWNER },
+    });
+  });
+
+  it('rotates credentials without changing saved locations, and invalidates previews before indexing', async () => {
+    const snapshot = await preview();
+    const old = await prisma.sourceConnection.findFirstOrThrow({
+      where: { id: connectionId, organizationId },
+    });
+    const update = (data: object) =>
+      request(app.getHttpServer())
+        .patch(api(`connections/${connectionId}`))
+        .set('Authorization', `Bearer ${token}`)
+        .send(data);
+    jest
+      .mocked(connector.verify)
+      .mockRejectedValueOnce(new ForbiddenException('Credential rejected'));
+    await update({ name: old.name, credential: 'bad-token', expectedRevision: 1 }).expect(403);
+    expect(
+      (
+        await prisma.sourceConnection.findFirstOrThrow({
+          where: { id: connectionId, organizationId },
+        })
+      ).encryptedCredential,
+    ).toBe(old.encryptedCredential);
+    const rotated = await update({
+      name: 'Renamed source',
+      credential: 'rotated-token',
+      expectedRevision: 1,
+    }).expect(200);
+    expect(rotated.body).toMatchObject({
+      revision: 2,
+      name: 'Renamed source',
+      locations: [{ id: locationId }],
+    });
+    expect(JSON.stringify(rotated.body)).not.toContain('rotated-token');
+    await update({ name: 'Stale update', credential: 'stale-token', expectedRevision: 1 }).expect(
+      409,
+    );
+    const ingestions = engine.ingest.mock.calls.length;
+    const replacements = engine.replace.mock.calls.length;
+    await importSelection(snapshot, ['policy']).expect(409);
+    await post('imports/preview', { locationId, previewId: snapshot.id }).expect(409);
+    await preview();
+    expect(connector.readPage).toHaveBeenLastCalledWith(
+      { config: { workspace: 'team' }, credential: 'rotated-token' },
+      'collection',
+      expect.any(Object),
+    );
+    expect(engine.ingest).toHaveBeenCalledTimes(ingestions);
+    expect(engine.replace).toHaveBeenCalledTimes(replacements);
+  });
+
+  it('disconnects and forgets shortcuts without deleting approved knowledge, then reconnects to the same identity', async () => {
+    const snapshot = await preview();
+    const before = await prisma.knowledgeSource.findMany({
+      where: { organizationId },
+      orderBy: { id: 'asc' },
+    });
+    const disconnected = await post(`connections/${connectionId}/disconnect`, {
+      expectedRevision: 2,
+    }).expect(200);
+    expect(disconnected.body).toMatchObject({
+      status: 'DISCONNECTED',
+      revision: 3,
+      locations: [{ id: locationId }],
+    });
+    expect(
+      (
+        await prisma.sourceConnection.findFirstOrThrow({
+          where: { id: connectionId, organizationId },
+        })
+      ).encryptedCredential,
+    ).toBeNull();
+    await post('imports/preview', { locationId }).expect(409);
+    await importSelection(snapshot, ['policy']).expect(409);
+    await post('connections', {
+      connectorId: 'fixture',
+      name: 'Duplicate',
+      config: {},
+      credential: 'token',
+    }).expect(409);
+    await request(app.getHttpServer())
+      .patch(api(`connections/${connectionId}`))
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Reconnected', credential: 'reconnected-token', expectedRevision: 3 })
+      .expect(200);
+    await importSelection(snapshot, ['policy']).expect(409);
+    const reconnected = await preview();
+    expect(reconnected.sourceId).toBe(snapshot.sourceId);
+    expect(reconnected.selectedIds).toEqual(snapshot.selectedIds);
+    await request(app.getHttpServer())
+      .delete(api(`locations/${locationId}`))
+      .set('Authorization', `Bearer ${token}`)
+      .expect(204);
+    await post('imports/preview', { locationId }).expect(404);
+    await importSelection(reconnected, ['policy']).expect(404);
+    const restored = await post(`connections/${connectionId}/locations`, {
+      locator: 'collection',
+      expectedRevision: 4,
+    }).expect(201);
+    expect(restored.body.id).toBe(locationId);
+    await importSelection(reconnected, ['policy']).expect(409);
+    expect(
+      await prisma.knowledgeSource.findMany({ where: { organizationId }, orderBy: { id: 'asc' } }),
+    ).toEqual(before);
+  });
+
+  it('does not save a location if the connection is disconnected during provider verification', async () => {
+    jest.mocked(connector.resolveLocation).mockImplementationOnce(async () => {
+      await post(`connections/${connectionId}/disconnect`, { expectedRevision: 4 }).expect(200);
+      return {
+        externalId: 'workspace/racing',
+        locator: 'racing',
+        name: 'Racing location',
+        url: 'https://example.com/racing',
+      };
+    });
+    await post(`connections/${connectionId}/locations`, {
+      locator: 'racing',
+      expectedRevision: 4,
+    }).expect(409);
+    expect(
+      await prisma.sourceLocation.count({
+        where: { organizationId, externalId: 'workspace/racing' },
+      }),
+    ).toBe(0);
   });
 });

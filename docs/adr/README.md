@@ -24,7 +24,8 @@ lightweight template: context, decision, consequences.
 | [0010](0010-provider-neutral-knowledge-engine.md)                    | Keep the company brain independent of its knowledge engine  | Accepted |
 | [0011](0011-application-owns-fine-grained-knowledge-access.md)       | Keep fine-grained knowledge access in the application layer | Accepted |
 | [0012](0012-manage-knowledge-source-lifecycle-in-the-application.md) | Manage knowledge source lifecycle in the application        | Accepted |
+| [0013](0013-organization-owned-source-connections.md)                | Organization-owned source connections                       | Accepted |
 
 Records 0001–0005 date from the original build. 0006–0009 were made when the
-codebase was generalised into a starter — see the Provenance section of the
-[README](../../README.md).
+codebase was generalised into a starter — see the
+[credits](../../README.md#credits--license).

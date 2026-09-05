@@ -39,16 +39,8 @@ class SourcePreviewQueryDto implements SourcePreviewQuery {
 }
 
 export class PreviewSourceDto implements PreviewSourceRequest {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(50)
-  connectorId: string;
-
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @IsString()
-  @MinLength(1)
-  @MaxLength(300)
-  locator: string;
+  @IsUUID()
+  locationId: string;
 
   @IsOptional()
   @IsUUID()

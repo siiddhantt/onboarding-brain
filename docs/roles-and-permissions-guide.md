@@ -40,8 +40,9 @@ Enforcement rules worth knowing:
   members, invites, domain mappings, and everything org-scoped.
 - **Only an `OWNER` can create another `OWNER`,** and an existing `OWNER`'s
   role cannot be changed by anyone else.
-- `ADMIN` and `OWNER` both manage invites and settings; everything else is
-  `MEMBER`-visible.
+- `ADMIN` and `OWNER` manage invites, settings, departments, source connections,
+  and knowledge. `MEMBER` can ask questions and read published sources and the
+  directory, but cannot browse connection previews or change published knowledge.
 - A department contact references a current organization membership, not a
   global user. Composite foreign keys enforce the same organization on both
   sides; removing membership also removes its contact assignments.

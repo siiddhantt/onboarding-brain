@@ -160,19 +160,7 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  DISCORD_BOT_TOKEN?: string;
-
-  @IsString()
-  @IsOptional()
-  DISCORD_GUILD_ID?: string;
-
-  @IsString()
-  @IsOptional()
-  DISCORD_CHANNEL_IDS?: string;
-
-  @IsString()
-  @IsOptional()
-  DISCORD_ORGANIZATION_ID?: string;
+  SOURCE_CREDENTIALS_ENCRYPTION_KEY?: string;
 
   @IsString()
   @IsOptional()

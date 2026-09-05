@@ -4,6 +4,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { SourcePreview } from '@app-starter/shared';
 import { SourceImportPanel } from '../SourceImportPanel';
 import { companyBrainApi } from '@/lib/company-brain-api';
+import { sourceConnectionsApi } from '@/lib/source-connections-api';
+
+jest.mock('@/lib/source-connections-api', () => ({
+  sourceConnectionsApi: { list: jest.fn() },
+  sourceConnectionKeys: (org: string) => ['source-connections', org],
+}));
 
 jest.mock('@/lib/company-brain-api', () => ({
   companyBrainApi: { listConnectors: jest.fn(), previewSource: jest.fn(), importSource: jest.fn() },
@@ -13,6 +19,7 @@ jest.mock('sonner', () => ({ toast: { success: jest.fn() } }));
 describe('SourceImportPanel', () => {
   const snapshot: SourcePreview = {
     id: 'preview-1',
+    locationId: 'saved-location',
     connectorId: 'fixture',
     externalId: 'collection',
     locator: 'collection',
@@ -52,6 +59,31 @@ describe('SourceImportPanel', () => {
         locatorPlaceholder: 'Collection ID',
         emptyStateHint: '',
         isConfigured: true,
+        connectionFields: [],
+        credentialLabel: 'Token',
+        canDiscoverLocations: false,
+      },
+    ]);
+    (sourceConnectionsApi.list as jest.Mock).mockResolvedValue([
+      {
+        id: 'connection',
+        connectorId: 'fixture',
+        name: 'Team source',
+        accountName: 'Team workspace',
+        config: {},
+        status: 'ACTIVE',
+        revision: 1,
+        lastVerifiedAt: '2026-09-05T00:00:00Z',
+        locations: [
+          {
+            id: 'saved-location',
+            connectionId: 'connection',
+            externalId: 'collection',
+            name: 'Saved policy',
+            locator: 'collection',
+            url: 'https://example.com/policy',
+          },
+        ],
       },
     ]);
     (companyBrainApi.previewSource as jest.Mock).mockResolvedValue(snapshot);
@@ -72,8 +104,7 @@ describe('SourceImportPanel', () => {
       </QueryClientProvider>,
     );
     await user.click(screen.getByRole('button', { name: /Import from a connected source/ }));
-    const input = await screen.findByLabelText('Collection');
-    await user.type(input, 'collection');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Preview' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Preview' }));
     await screen.findByText('Onboarding policy');
     return { user, onImported };
@@ -195,16 +226,14 @@ describe('SourceImportPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Search source' }));
     await screen.findByRole('button', { name: 'Load more items' });
     expect(companyBrainApi.previewSource).toHaveBeenLastCalledWith('org-1', {
-      connectorId: 'fixture',
-      locator: 'collection',
+      locationId: 'saved-location',
       previewId: 'preview-1',
       query: { text: 'coffee' },
     });
     await user.click(screen.getByRole('button', { name: 'Load more items' }));
     await waitFor(() =>
       expect(companyBrainApi.previewSource).toHaveBeenLastCalledWith('org-1', {
-        connectorId: 'fixture',
-        locator: 'collection',
+        locationId: 'saved-location',
         previewId: 'searched',
         cursor: 'page-2',
         query: { text: 'coffee' },

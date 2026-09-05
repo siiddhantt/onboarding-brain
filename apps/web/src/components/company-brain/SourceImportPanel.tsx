@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ChevronDown, ExternalLink, Loader2, Plug } from 'lucide-react';
 import { toast } from 'sonner';
@@ -8,17 +8,9 @@ import { MAX_SOURCE_SELECTION_ITEMS } from '@app-starter/shared';
 import type { KnowledgeSource, PreviewSourceRequest, SourcePreview } from '@app-starter/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { IconTile } from '@/components/ui/icon-tile';
 import { SourcePreviewBrowser } from './SourcePreviewBrowser';
+import { SourceConnectionPicker } from './SourceConnectionPicker';
 import { companyBrainApi } from '@/lib/company-brain-api';
 import { cn } from '@/lib/utils';
 
@@ -42,7 +34,6 @@ export const SourceImportPanel = ({
 }: SourceImportPanelProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [connectorId, setConnectorId] = useState('');
-  const [locator, setLocator] = useState('');
   const [preview, setPreview] = useState<SourcePreview | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [canShare, setCanShare] = useState(false);
@@ -53,13 +44,19 @@ export const SourceImportPanel = ({
     queryKey: ['source-connectors', organizationId],
     queryFn: () => companyBrainApi.listConnectors(organizationId),
   });
-  const activeId = connectorId || connectorsQuery.data?.[0]?.id || '';
-  const connector = connectorsQuery.data?.find((item) => item.id === activeId);
+  const connector = connectorsQuery.data?.find((item) => item.id === connectorId);
+  const handleLocationChange = useCallback((_locationId: string, providerId: string) => {
+    setConnectorId(providerId);
+    setPreview(null);
+    setSelectedIds(new Set());
+    setError(null);
+    setCanShare(false);
+    setCanRestore(false);
+  }, []);
 
   useEffect(() => {
     if (!reviewSource?.origin) return;
     setConnectorId(reviewSource.origin.connectorId);
-    setLocator(reviewSource.origin.url);
     setIsOpen(true);
     setPreview(null);
     setError(null);
@@ -142,70 +139,24 @@ export const SourceImportPanel = ({
           )}
           {connectorsQuery.isError && (
             <p role="alert" className="text-sm text-destructive">
-              Connectors could not be loaded. Refresh the page.
+              Connectors could not be loaded.{' '}
+              <button className="underline" onClick={() => connectorsQuery.refetch()}>
+                Retry
+              </button>
             </p>
           )}
-          <form
-            className="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:items-end"
-            onSubmit={(event) => {
-              event.preventDefault();
+          <SourceConnectionPicker
+            key={`${organizationId}:${reviewSource?.id ?? 'browse'}`}
+            organizationId={organizationId}
+            connectors={connectorsQuery.data ?? []}
+            reviewSource={reviewSource}
+            isBusy={isBusy}
+            onChange={handleLocationChange}
+            onPreview={(locationId) => {
               setError(null);
-              previewMutation.mutate({ connectorId: activeId, locator });
+              previewMutation.mutate({ locationId });
             }}
-          >
-            <div className="min-w-0 space-y-2">
-              <Label htmlFor="source-connector">Source</Label>
-              <Select
-                value={activeId}
-                disabled={isBusy}
-                onValueChange={(value) => {
-                  setConnectorId(value);
-                  setPreview(null);
-                  setLocator('');
-                  setError(null);
-                }}
-              >
-                <SelectTrigger id="source-connector">
-                  <SelectValue placeholder="Choose a source" />
-                </SelectTrigger>
-                <SelectContent>
-                  {connectorsQuery.data?.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="min-w-0 space-y-2">
-              <Label htmlFor="source-locator">{connector?.locatorLabel ?? 'Source location'}</Label>
-              <Input
-                id="source-locator"
-                value={locator}
-                maxLength={300}
-                placeholder={connector?.locatorPlaceholder}
-                disabled={isBusy || !connector?.isConfigured}
-                onChange={(event) => {
-                  setLocator(event.target.value);
-                  setPreview(null);
-                }}
-              />
-            </div>
-            <Button
-              type="submit"
-              variant="outline"
-              disabled={isBusy || !connector?.isConfigured || !locator.trim()}
-            >
-              {previewMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Preview
-            </Button>
-          </form>
-          {connector && !connector.isConfigured && (
-            <p className="text-xs leading-5 text-muted-foreground">
-              {connector.name} is not configured for this organization. Ask the app operator to
-              configure its credentials and source access.
-            </p>
-          )}
+          />
           {error && (
             <p role="alert" className="text-sm text-destructive">
               {error}
@@ -247,16 +198,14 @@ export const SourceImportPanel = ({
                 onToggle={handleToggleItem}
                 onSearch={(query) =>
                   previewMutation.mutate({
-                    connectorId: preview.connectorId,
-                    locator: preview.locator,
+                    locationId: preview.locationId,
                     previewId: preview.id,
                     query,
                   })
                 }
                 onLoadMore={() =>
                   previewMutation.mutate({
-                    connectorId: preview.connectorId,
-                    locator: preview.locator,
+                    locationId: preview.locationId,
                     previewId: preview.id,
                     cursor: preview.nextCursor!,
                     query: preview.query,

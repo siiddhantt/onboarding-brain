@@ -1,10 +1,11 @@
-import { ConfigService } from '@nestjs/config';
+import { DiscordClient } from './discord.client';
 import { DiscordConnector } from './discord.connector';
 
 describe('DiscordConnector', () => {
   const guildId = '100000000000000001';
   const channelId = '100000000000000002';
   const threadId = '100000000000000003';
+  const access = { config: { guildId }, credential: 'test-bot-token' };
   const originalFetch = global.fetch;
   let fetchMock: jest.Mock;
   let connector: DiscordConnector;
@@ -26,13 +27,7 @@ describe('DiscordConnector', () => {
   });
 
   beforeEach(() => {
-    const values = {
-      DISCORD_BOT_TOKEN: 'test-bot-token',
-      DISCORD_GUILD_ID: guildId,
-      DISCORD_CHANNEL_IDS: channelId,
-      DISCORD_ORGANIZATION_ID: 'org-1',
-    };
-    connector = new DiscordConnector(new ConfigService(values));
+    connector = new DiscordConnector(new DiscordClient());
     fetchMock = jest.fn();
     global.fetch = fetchMock;
   });
@@ -52,7 +47,7 @@ describe('DiscordConnector', () => {
           message('100000000000000013', { content: '', attachments: [{ filename: 'file.pdf' }] }),
         ]),
       );
-    const result = await connector.readPage('org-1', channelId);
+    const result = await connector.readPage(access, channelId);
     expect(result.items).toEqual([
       expect.objectContaining({
         id: '100000000000000011',
@@ -66,7 +61,7 @@ describe('DiscordConnector', () => {
     });
   });
 
-  it('offers a public thread starter for explicit selection and supports its parent allowlist', async () => {
+  it('offers a public thread starter for explicit selection', async () => {
     fetchMock
       .mockResolvedValueOnce(
         response({
@@ -83,7 +78,7 @@ describe('DiscordConnector', () => {
         response(message(threadId, { content: 'How do expense reports work?' })),
       );
     const result = await connector.readPage(
-      'org-1',
+      access,
       `https://discord.com/channels/${guildId}/${threadId}`,
     );
     expect(result.externalId).toBe(`${guildId}/${threadId}`);
@@ -91,33 +86,96 @@ describe('DiscordConnector', () => {
     expect(result.items[0].text).toBe('How do expense reports work?');
   });
 
-  it('rejects another organization and arbitrary URLs before making a request', async () => {
-    await expect(connector.readPage('org-2', channelId)).rejects.toThrow('not configured');
-    await expect(connector.readPage('org-1', 'https://localhost/secrets')).rejects.toThrow(
+  it('rejects invalid configuration and arbitrary URLs before making a request', async () => {
+    await expect(
+      connector.readPage({ ...access, config: { guildId: 'invalid' } }, channelId),
+    ).rejects.toThrow('server ID');
+    await expect(connector.readPage(access, 'https://localhost/secrets')).rejects.toThrow(
       'channel ID',
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('does not fetch messages from an unapproved channel or a different server', async () => {
+  it('does not fetch private threads or channels from a different server', async () => {
     fetchMock
-      .mockResolvedValueOnce(response({ id: threadId, guild_id: guildId, type: 0 }))
+      .mockResolvedValueOnce(response({ id: threadId, guild_id: guildId, type: 12 }))
       .mockResolvedValueOnce(response({ id: channelId, guild_id: 'another-server', type: 0 }));
-    await expect(connector.readPage('org-1', threadId)).rejects.toThrow('allowlist');
-    await expect(connector.readPage('org-1', channelId)).rejects.toThrow('configured server');
+    await expect(connector.readPage(access, threadId)).rejects.toThrow('public thread');
+    await expect(connector.readPage(access, channelId)).rejects.toThrow('connection’s server');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('respects Discord retry-after instead of issuing repeated requests', async () => {
     fetchMock.mockResolvedValueOnce(response({ retry_after: 20 }, 429));
-    await expect(connector.readPage('org-1', channelId)).rejects.toThrow('rate limit');
-    await expect(connector.readPage('org-1', channelId)).rejects.toThrow('rate limit');
+    await expect(connector.readPage(access, channelId)).rejects.toThrow('rate limit');
+    await expect(connector.readPage(access, channelId)).rejects.toThrow('rate limit');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    fetchMock.mockResolvedValueOnce(response({}, 403));
+    await expect(
+      connector.readPage({ ...access, credential: 'another-bot' }, channelId),
+    ).rejects.toThrow('permissions');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('validates bot access and normalizes only supported non-secret configuration', async () => {
+    fetchMock
+      .mockResolvedValueOnce(response({ bot: true }))
+      .mockResolvedValueOnce(response({ id: guildId, name: 'Team server' }));
+    await expect(connector.verify(access)).resolves.toEqual({
+      externalAccountId: guildId,
+      accountName: 'Team server',
+      config: { guildId },
+    });
+    await expect(
+      connector.verify({ ...access, config: { guildId, token: 'must-not-be-config' } }),
+    ).rejects.toThrow('No other connection settings');
+    fetchMock.mockResolvedValueOnce(response({ bot: false }));
+    await expect(connector.verify(access)).rejects.toThrow('not a user token');
+  });
+
+  it('lists readable channels by name and checks history access before saving one', async () => {
+    const botId = '100000000000000099';
+    const readable = {
+      id: channelId,
+      guild_id: guildId,
+      type: 0,
+      name: 'onboarding',
+      permission_overwrites: [],
+    };
+    fetchMock
+      .mockResolvedValueOnce(response({ id: botId, bot: true }))
+      .mockResolvedValueOnce(
+        response({
+          id: guildId,
+          roles: [{ id: guildId, permissions: String((1n << 10n) | (1n << 16n)) }],
+        }),
+      )
+      .mockResolvedValueOnce(response({ roles: [] }))
+      .mockResolvedValueOnce(
+        response([
+          readable,
+          {
+            ...readable,
+            id: threadId,
+            permission_overwrites: [{ id: botId, type: 1, deny: String(1n << 10n), allow: '0' }],
+          },
+        ]),
+      );
+    await expect(connector.discoverLocations(access)).resolves.toEqual([
+      {
+        externalId: `${guildId}/${channelId}`,
+        locator: channelId,
+        name: 'Channel: onboarding',
+        url: `https://discord.com/channels/${guildId}/${channelId}`,
+      },
+    ]);
+    fetchMock.mockResolvedValueOnce(response(readable)).mockResolvedValueOnce(response({}, 403));
+    await expect(connector.resolveLocation(access, channelId)).rejects.toThrow('permissions');
   });
 
   it('keeps upstream errors and credentials out of error responses', async () => {
     fetchMock.mockRejectedValueOnce(new Error('Authorization: Bot test-bot-token'));
-    await expect(connector.readPage('org-1', channelId)).rejects.toThrow('Could not read Discord');
+    await expect(connector.readPage(access, channelId)).rejects.toThrow('Could not read Discord');
   });
 
   it('loads only one bounded page at a time and advances past pages with no readable human text', async () => {
@@ -126,14 +184,14 @@ describe('DiscordConnector', () => {
       message(String(100000000000000200n - BigInt(index)), { author: { bot: true } }),
     );
     fetchMock.mockResolvedValueOnce(channel).mockResolvedValueOnce(response(raw));
-    const first = await connector.readPage('org-1', channelId);
+    const first = await connector.readPage(access, channelId);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(first.items).toEqual([]);
     expect(first.nextCursor).toBe(raw[99].id);
     fetchMock
       .mockResolvedValueOnce(channel)
       .mockResolvedValueOnce(response([message('100000000000000011')]));
-    const next = await connector.readPage('org-1', channelId, {
+    const next = await connector.readPage(access, channelId, {
       cursor: first.nextCursor!,
       limit: 20,
     });
@@ -151,7 +209,7 @@ describe('DiscordConnector', () => {
       }),
     );
     const query = { text: 'Juniper', from: '2026-09-05T00:00:00Z', to: '2026-09-06T00:00:00Z' };
-    const first = await connector.readPage('org-1', channelId, { query });
+    const first = await connector.readPage(access, channelId, { query });
     const url = new URL(fetchMock.mock.calls[1][0]);
     expect(url.pathname).toBe(`/api/v10/guilds/${guildId}/messages/search`);
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
@@ -168,7 +226,7 @@ describe('DiscordConnector', () => {
     fetchMock
       .mockResolvedValueOnce(channel)
       .mockResolvedValueOnce(response({ messages: [], total_results: 60 }));
-    const next = await connector.readPage('org-1', channelId, { query, cursor: first.nextCursor! });
+    const next = await connector.readPage(access, channelId, { query, cursor: first.nextCursor! });
     expect(fetchMock.mock.calls[3][0]).toContain('offset=25');
     expect(next.nextCursor).toBe('search:50');
   });
@@ -177,7 +235,7 @@ describe('DiscordConnector', () => {
     const channel = response({ id: channelId, guild_id: guildId, type: 0 });
     fetchMock.mockResolvedValueOnce(channel).mockResolvedValueOnce(response({ code: 110000 }, 202));
     await expect(
-      connector.readPage('org-1', channelId, { query: { text: 'policy' } }),
+      connector.readPage(access, channelId, { query: { text: 'policy' } }),
     ).rejects.toThrow('preparing its search index');
     fetchMock.mockResolvedValueOnce(channel).mockResolvedValueOnce(
       response({
@@ -186,7 +244,7 @@ describe('DiscordConnector', () => {
       }),
     );
     await expect(
-      connector.readPage('org-1', channelId, { query: { text: 'policy' } }),
+      connector.readPage(access, channelId, { query: { text: 'policy' } }),
     ).rejects.toThrow('invalid message identity');
   });
 });

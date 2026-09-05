@@ -9,22 +9,21 @@ opt-in.
 
 For who to host these with, see [providers.md](providers.md).
 
-| Integration                           | Required?      | Without it                                      |
-| ------------------------------------- | -------------- | ----------------------------------------------- |
-| [PostgreSQL](#postgresql)             | Yes            | The API will not start                          |
-| [Redis](#redis)                       | Yes            | Sign-in, OTP, and password reset break          |
-| [SMTP](#smtp-email)                   | For real email | Sends fail; nothing else breaks                 |
-| [Mailpit](#mailpit-local-email)       | Local only     | Development email has nowhere to go             |
-| [Google OAuth](#google-oauth)         | No             | "Sign in with Google" fails; other auth is fine |
-| [Object storage](#object-storage)     | No             | Files are written to local disk                 |
-| [Cognee](#cognee-knowledge-layer)     | No             | Knowledge ingestion and search are unavailable  |
-| [Custom domains](#custom-domains-dns) | No             | Tenants use the main app domain                 |
-| [Local HTTPS](#local-https)           | No             | Development runs over HTTP                      |
+| Integration                               | Required?      | Without it                                               |
+| ----------------------------------------- | -------------- | -------------------------------------------------------- |
+| [PostgreSQL](#postgresql)                 | Yes            | The API will not start                                   |
+| [Redis](#redis)                           | Yes            | Sign-in, OTP, and password reset break                   |
+| [SMTP](#smtp-email)                       | For real email | Sends fail; nothing else breaks                          |
+| [Mailpit](#mailpit-local-email)           | Local only     | Development email has nowhere to go                      |
+| [Google OAuth](#google-oauth)             | No             | "Sign in with Google" fails; other auth is fine          |
+| [Object storage](#object-storage)         | No             | Files are written to local disk                          |
+| [Cognee](#cognee-knowledge-layer)         | No             | Knowledge ingestion and search are unavailable           |
+| [Source connections](#source-connections) | No             | Document uploads work; connected imports are unavailable |
+| [Custom domains](#custom-domains-dns)     | No             | Tenants use the main app domain                          |
+| [Local HTTPS](#local-https)               | No             | Development runs over HTTP                               |
 
-PostgreSQL and Redis are both required. Only `DATABASE_URL` and `JWT_SECRET`
-are _validated_ at startup, so a missing Redis host lets the API boot and then
-fails at the first sign-in. Being unvalidated is not the same as being
-optional — read the notes below before leaving a value blank.
+PostgreSQL and Redis are required. The API validates `DATABASE_URL`, `JWT_SECRET`,
+and `REDIS_HOST` at startup; the configured services must also be reachable.
 
 ---
 
@@ -43,11 +42,6 @@ COGNEE_CLOUD_API_KEY=<your API key>
 COGNEE_DATASET_PREFIX=organization
 ```
 
-The hosted adapter uses Cognee's `remember` endpoint for ingestion. Questions
-retrieve `CHUNKS` first; only when evidence exists does the adapter request a
-`RAG_COMPLETION`. Retrieved document IDs become citations in the product
-response.
-
 ### Embedded TypeScript SDK
 
 ```bash
@@ -58,110 +52,120 @@ OPENAI_MODEL=gpt-4o-mini
 OPENAI_TOKEN=<your OpenAI API key>
 ```
 
-The embedded runtime is loaded only on its first operation. Both providers
-implement the same `KnowledgeEngine` interface, so company-brain routes and
-connectors do not depend on provider response types. See
-[ADR 0010](adr/0010-provider-neutral-knowledge-engine.md).
-
-For both providers, the API derives the dataset name from the authenticated
-organization ID. Clients cannot supply a dataset. Owners and admins may upload,
-replace, and remove documents up to 10 MB; all organization members may ask
-questions and view sources. Provider errors are not exposed to clients.
-
-Replacement retains the application's source ID and increments its version.
-Removal deletes the provider item before archiving its local record. These
-operations run synchronously; interrupted operations can require reconciliation.
-See [ADR 0012](adr/0012-manage-knowledge-source-lifecycle-in-the-application.md).
+Set these values in `apps/api/.env` and restart the API. Ingestion and questions
+use the configured provider and may incur usage charges. Cognee credentials are
+operator-managed; source connection credentials are managed separately per
+organization. The API derives each dataset from the authenticated organization.
 
 Official references: [Cognee Cloud API keys](https://docs.cognee.ai/cognee-cloud/ui/api-keys),
 [data ingestion](https://docs.cognee.ai/cognee-cloud/functionality/data-ingestion),
 and [search](https://docs.cognee.ai/api-reference/search/search).
 
-**Verify without making an external call:**
-
-```bash
-pnpm --filter @app-starter/api test -- cognee-cloud.service.spec.ts cognee.service.spec.ts company-brain.service.spec.ts
-```
+For the adapter boundary and replacement/removal behavior, see
+[ADR 0010](adr/0010-provider-neutral-knowledge-engine.md) and
+[ADR 0012](adr/0012-manage-knowledge-source-lifecycle-in-the-application.md).
 
 ---
 
-## Discord: curated imports
+## Source connections
 
-The first connector reads text from explicitly allowlisted server channels and
-public threads. It does not use your personal Discord account, post messages,
-download attachments, or run automatic syncs.
+Each organization manages its own provider connections and saved locations in
+**Company brain → Knowledge → Import from a connected source**. Credentials are
+entered in the app, not shared through deployment-wide provider environment
+variables. Discord is the available connector; other providers need an adapter
+and their own authorization flow.
 
-### Set up a test bot
+### Credential storage
 
-1. Create your own Discord test server and a text channel such as `#onboarding-demo`.
-2. In the [Developer Portal](https://discord.com/developers/applications), create an
-   application. Under **Bot**, enable **Message Content Intent**. Presence and
-   Server Members intents are not needed.
-3. Under **Installation**, enable **Guild Install**, select the `bot` scope and
-   **View Channels** / **Read Message History** permissions. Use the install link
-   to add the bot to your test server. Do not grant Administrator permissions.
-4. Enable **Developer Mode** in Discord's **User Settings → Advanced**. Copy the
-   server ID and channel ID from their right-click menus.
-5. Generate a token under **Bot → Reset Token**. Keep it in `apps/api/.env`, never
-   in Git, the frontend, screenshots, or chat:
+Set `SOURCE_CREDENTIALS_ENCRYPTION_KEY` in `apps/api/.env` to a random 32-byte hex
+key (generate one with `openssl rand -hex 32`), then restart the API. This is an
+infrastructure encryption key, not a provider token. Without it, connections are
+unavailable; documents and the rest of the app still work.
 
-```dotenv
-DISCORD_BOT_TOKEN=your-bot-token
-DISCORD_GUILD_ID=your-server-id
-DISCORD_CHANNEL_IDS=your-channel-id
-DISCORD_ORGANIZATION_ID=your-local-organization-id
-```
+Credentials are encrypted with AES-256-GCM and bound to their organization and
+connection. Keep the key out of Git, logs and database backups; store a secure
+backup separately. All API replicas need the same key. HTTPS is required outside
+local development. Do not simply replace the key: existing credentials then
+cannot be decrypted. Until a re-encryption/keyring tool exists, key rotation
+requires replacing each connection credential in the UI.
 
-Channel IDs are comma-separated. Public threads inherit eligibility from their
-allowlisted parent; a channel import does not recursively fetch its threads.
-Use a thread's own ID/link to review it. Private threads and DMs are unsupported.
-The organization ID is the UUID in the local app's organization URL. Restart the
-API after changing configuration. This read-only REST connector needs no public
-webhook endpoint or separate bot process.
+### Manage connections
+
+- **Connect source** verifies access before saving a write-only credential.
+  Owners/admins can rename, verify, or replace it without restarting the app;
+  a failed verification leaves the existing credential unchanged.
+- **Save location** keeps a collection available for future previews. It does
+  not publish any content. A different provider account needs a new connection.
+- **Disconnect** erases the credential and invalidates previews, but keeps saved
+  locations and published knowledge. It does not revoke the provider's token.
+- **Forget saved location** removes the shortcut, not its published knowledge.
+  Use **Remove from brain** on the indexed source to remove that knowledge.
+
+Connection changes invalidate earlier previews but cannot cancel an import
+already accepted for indexing. See
+[ADR 0013](adr/0013-organization-owned-source-connections.md) for the ownership and
+lifecycle boundaries.
 
 ### Import and revise
 
-Open **Company brain → Knowledge → Import from a connected source** as an owner
-or admin. Paste a channel ID/link and preview. Select only useful items, confirm
-they may be shared with everyone in the organization, then import. The source's
-menu offers **Review selection** and **Remove from brain**.
+Choose a saved location, preview, select items, and confirm organization-wide
+sharing. Later, **Review selection** updates that snapshot without creating a
+second source. An unchanged selection skips indexing.
 
-- Previewing makes Discord calls but no Cognee calls. Previews are bound to the
-  user and organization and expire from Redis after 15 minutes.
-- Read up to 100 messages per page, 500 items per preview, and select up to 100.
-  Selected items are indexed together, keeping their context and original links.
-- **Loaded items** filters fetched content locally. **Search source** uses the
-  connector's native search within the chosen collection (Discord: 25 results
-  per page). Date bounds use the curator's local days; Discord filters creation
-  time, not edit time. Selected items stay visible across searches and page loads.
-  Search indexing delays and rate limits are errors to retry, not empty results.
-  Native results reflect the provider's search index, which can lag recent messages.
-- PostgreSQL stores only selected text and excluded item IDs, not unselected
-  chatter. Existing selections stay checked; new items stay unchecked. Previously
-  selected items outside fetched pages are marked **Saved snapshot**.
-- Updates reuse the source identity. An unchanged selection skips indexing;
-  a changed selection uses the existing provider replacement operation.
-- Removal deletes derived knowledge and the locally retained text. An identity
-  tombstone prevents accidental re-import; re-adding requires explicit confirmation.
-- This is a reviewed snapshot, not a mirror: upstream edits/deletions require
-  another review. Source-channel permissions are not copied into the org dataset.
-- Credentials are operator-managed for one org/server per deployment in this
-  slice. Per-org OAuth connections, automatic sync, and durable job recovery are
-  separate follow-ups; do not use this as a production connector platform yet.
+- Previews call the source provider, not Cognee. They expire and are visible only
+  to the requesting curator in that organization.
+- **Loaded items** filters fetched content. **Search source**, when supported,
+  searches the provider's index, which can lag recent changes. Date bounds use
+  local days; the connector identifies whether they apply to creation or edit time.
+- Selections remain visible across searches and page loads. New items are not
+  automatically selected. Previously selected items outside the loaded pages are
+  shown as **Saved snapshot**, not assumed deleted.
+- Upstream edits/deletions need review; imports do not mirror them automatically.
+  Removal clears indexed knowledge and retained text without changing the source.
+  Re-adding a removed source requires explicit confirmation.
 
-`SourceConnector` owns provider access, pagination and normalization. The shared
-import service owns preview sessions and selection; `CompanyBrainService` owns
-identity and indexing through `KnowledgeEngine`. A Slack or document-service
-adapter can reuse these paths without adding Slack fields to the knowledge engine.
-Provider-specific authorization still needs an explicit implementation.
-Adapters advertise native search support and its date field; they translate
-plain text/date bounds and own opaque cursors. Without that capability the same
-preview offers loaded-item filtering. A preview is bounded, not a full search index.
+Published content is shared with **all organization members**, not just people
+with access to its original location. Confirm that sharing is appropriate before
+importing. See the [workflow](../README.md#workflow).
 
-References: [Discord bot setup](https://docs.discord.com/developers/quick-start/getting-started),
-[message access](https://docs.discord.com/developers/resources/message#get-channel-messages),
-[threads](https://docs.discord.com/developers/topics/threads),
-[rate limits](https://docs.discord.com/developers/topics/rate-limits).
+## Discord: curated imports
+
+Use a server you administer or have permission to connect. The connector reads
+text from server channels and public threads using a bot, not a personal account.
+It does not post messages, download attachments, or read DMs or private threads.
+
+1. Create and install a bot using the
+   [Discord setup guide](https://docs.discord.com/developers/quick-start/getting-started).
+   Enable **Message Content Intent** and grant **View Channels** and **Read
+   Message History** only in approved channels. Administrator permission is not
+   needed; neither are Presence or Server Members intents.
+2. Choose **Connect source → Discord** in the app. Enter a name, the server ID,
+   and the bot token. One server has one connection per organization; separate
+   organizations manage their credentials independently. Never put tokens in
+   Git, screenshots, or chat.
+3. Choose **Save location** to discover readable channels by name, or save a
+   public thread using its link. You only need to enter that link once. A channel
+   selection does not include its child threads or future replies automatically.
+
+Discord date searches use message creation time. The connector uses REST: no
+public webhook or separate bot process is needed. Bot access is not proof of a
+curator's personal Discord permissions; restrict the bot's access accordingly.
+
+<details>
+<summary>Upgrading an older environment-based Discord connection</summary>
+
+Set the encryption key and apply migrations, then run:
+
+```bash
+pnpm --filter @app-starter/api exec ts-node scripts/migrate-discord-connection.ts
+```
+
+This retryable migration verifies the old `DISCORD_*` configuration and saves
+its connection and allowlisted channels in the configured organization. Published
+snapshots are unchanged. Check the UI, then remove those old fields from `.env`;
+runtime code no longer reads them.
+
+</details>
 
 ---
 
@@ -217,11 +221,6 @@ REDIS_TLS=false        # set true for providers that require TLS
 - **Password reset tokens**
 - **Custom domain resolution cache**
 
-Three of those four are authentication paths, which is why Redis is not
-optional. The API will start without it, because the config validator does
-not check `REDIS_HOST` — the failure surfaces later, when a user tries to
-sign in.
-
 **Local:** started by `docker compose up -d`. Host port from `REDIS_PORT` in
 the root `.env` (default 6379).
 
@@ -230,8 +229,9 @@ the root `.env` (default 6379).
 
 **Inside Docker:** use the service name — `REDIS_HOST=redis`.
 
-**Without it:** the API boots, but refresh, OTP sign-in, and password reset
-all fail at runtime. Errors are logged from `RedisService`.
+**Without it:** a missing `REDIS_HOST` prevents startup. An unreachable Redis
+service breaks refresh, OTP sign-in, and password reset; errors are logged from
+`RedisService`.
 
 **Verify:**
 

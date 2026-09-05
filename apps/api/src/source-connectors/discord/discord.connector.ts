@@ -2,40 +2,30 @@ import {
   BadGatewayException,
   BadRequestException,
   ForbiddenException,
-  HttpException,
   Injectable,
-  NotFoundException,
-  ServiceUnavailableException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type { SourceConnectorDescriptor, SourceRecord } from '@app-starter/shared';
+import type { SourceConnectorDescriptor, SourceLocation, SourceRecord } from '@app-starter/shared';
 import type {
   SourceCollectionPage,
   SourceConnector,
   SourcePageOptions,
+  SourceAccess,
 } from '../source-connector.interface';
 import { discordSearchPage, discordSearchParams } from './discord-search';
+import { DiscordClient, discordObject as object } from './discord.client';
+import { canReadDiscordChannel } from './discord-permissions';
 
 const SNOWFLAKE = /^\d{17,20}$/;
 const PAGE_SIZE = 100;
 const CHANNEL_TYPES = new Set([0, 5, 10, 11]);
 const THREAD_TYPES = new Set([10, 11]);
 
-const object = (value: unknown): Record<string, unknown> => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new BadGatewayException('Discord returned an unreadable response.');
-  }
-  return value as Record<string, unknown>;
-};
-
 @Injectable()
 export class DiscordConnector implements SourceConnector {
   readonly id = 'discord';
-  private retryAt = 0;
+  constructor(private readonly client: DiscordClient) {}
 
-  constructor(private readonly config: ConfigService) {}
-
-  describe(organizationId: string): SourceConnectorDescriptor {
+  describe(): SourceConnectorDescriptor {
     return {
       id: this.id,
       name: 'Discord',
@@ -44,42 +34,124 @@ export class DiscordConnector implements SourceConnector {
       locatorPlaceholder: 'Paste a channel ID or Discord channel link',
       emptyStateHint:
         'Check Message Content Intent and Read Message History. Bot messages and attachments are not imported.',
-      isConfigured: Boolean(
-        this.config.get<string>('DISCORD_BOT_TOKEN') &&
-        SNOWFLAKE.test(this.config.get<string>('DISCORD_GUILD_ID') ?? '') &&
-        this.allowedChannels().length &&
-        this.config.get<string>('DISCORD_ORGANIZATION_ID') === organizationId,
-      ),
+      isConfigured: true,
+      credentialLabel: 'Bot token',
+      connectionFields: [
+        {
+          key: 'guildId',
+          label: 'Discord server ID',
+          placeholder: 'Copy the server ID once from Discord',
+        },
+      ],
+      canDiscoverLocations: true,
     };
   }
 
+  async verify(access: SourceAccess) {
+    const guildId = this.guildId(access);
+    const user = object(await this.client.get(access.credential, '/users/@me'));
+    if (user.bot !== true)
+      throw new BadRequestException('Use a Discord bot token, not a user token.');
+    const guild = object(await this.client.get(access.credential, `/guilds/${guildId}`));
+    if (guild.id !== guildId || typeof guild.name !== 'string')
+      throw new BadGatewayException('Discord returned an invalid server.');
+    return {
+      externalAccountId: guildId,
+      accountName: guild.name.slice(0, 100),
+      config: { guildId },
+    };
+  }
+
+  async discoverLocations(access: SourceAccess): Promise<SourceLocation[]> {
+    const guildId = this.guildId(access);
+    const user = object(await this.client.get(access.credential, '/users/@me'));
+    if (user.bot !== true || !SNOWFLAKE.test(String(user.id)))
+      throw new BadGatewayException('Discord returned an invalid bot identity.');
+    const guild = object(await this.client.get(access.credential, `/guilds/${guildId}`));
+    if (guild.id !== guildId) throw new BadGatewayException('Discord returned an invalid server.');
+    const member = object(
+      await this.client.get(access.credential, `/guilds/${guildId}/members/${user.id}`),
+    );
+    const raw = await this.client.get(access.credential, `/guilds/${guildId}/channels`);
+    if (!Array.isArray(raw) || raw.length > 1000)
+      throw new BadGatewayException('Discord returned an invalid channel list.');
+    return raw
+      .map(object)
+      .filter(
+        (channel) =>
+          [0, 5].includes(Number(channel.type)) &&
+          channel.guild_id === guildId &&
+          canReadDiscordChannel(guild, member, String(user.id), channel),
+      )
+      .map((channel) => this.location(channel, guildId))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async resolveLocation(access: SourceAccess, locator: string): Promise<SourceLocation> {
+    const guildId = this.guildId(access);
+    const channel = await this.channel(access, locator);
+    // Check actual read access when saving, not just existence in the server directory.
+    await this.client.get(access.credential, `/channels/${channel.id}/messages?limit=1`);
+    return this.location(channel, guildId);
+  }
+
+  private async channel(access: SourceAccess, locator: string) {
+    const guildId = this.guildId(access);
+    const channelId = this.channelId(locator, guildId);
+    const channel = object(await this.client.get(access.credential, `/channels/${channelId}`));
+    if (
+      channel.id !== channelId ||
+      channel.guild_id !== guildId ||
+      !CHANNEL_TYPES.has(Number(channel.type))
+    )
+      throw new ForbiddenException(
+        'Use a text channel or public thread in this connection’s server.',
+      );
+    return channel;
+  }
+
+  private location(channel: Record<string, unknown>, guildId: string): SourceLocation {
+    if (!SNOWFLAKE.test(String(channel.id)) || typeof channel.name !== 'string')
+      throw new BadGatewayException('Discord returned an invalid channel.');
+    return {
+      externalId: `${guildId}/${channel.id}`,
+      name: `${THREAD_TYPES.has(Number(channel.type)) ? 'Thread' : 'Channel'}: ${channel.name.slice(0, 150)}`,
+      url: `https://discord.com/channels/${guildId}/${channel.id}`,
+      locator: String(channel.id),
+    };
+  }
+
+  private guildId(access: SourceAccess): string {
+    if (
+      Object.keys(access.config).length !== 1 ||
+      typeof access.config.guildId !== 'string' ||
+      !SNOWFLAKE.test(access.config.guildId)
+    )
+      throw new BadRequestException(
+        'Enter a valid Discord server ID. No other connection settings are supported.',
+      );
+    return access.config.guildId;
+  }
+
   async readPage(
-    organizationId: string,
+    access: SourceAccess,
     locator: string,
     options: SourcePageOptions = {},
   ): Promise<SourceCollectionPage> {
     const { cursor, query = {} } = options;
     const isSearch = Boolean(query.text || query.from || query.to);
-    if (!this.describe(organizationId).isConfigured) {
-      throw new ServiceUnavailableException('Discord is not configured for this organization.');
-    }
-    const guildId = this.config.get<string>('DISCORD_GUILD_ID')!;
+    const guildId = this.guildId(access);
     const channelId = this.channelId(locator, guildId);
     if (cursor && !isSearch && !SNOWFLAKE.test(cursor))
       throw new BadRequestException('Invalid Discord cursor.');
 
-    const channel = object(await this.get(`/channels/${channelId}`));
+    const channel = await this.channel(access, locator);
     const parentId = typeof channel.parent_id === 'string' ? channel.parent_id : null;
-    if (channel.guild_id !== guildId || !CHANNEL_TYPES.has(Number(channel.type))) {
-      throw new ForbiddenException('Use a text channel or public thread in the configured server.');
-    }
     const isThread = THREAD_TYPES.has(Number(channel.type));
-    if (
-      !this.allowedChannels().includes(channelId) &&
-      !(isThread && parentId && this.allowedChannels().includes(parentId))
-    ) {
-      throw new ForbiddenException('This channel is not in the organization’s import allowlist.');
-    }
+    if (isThread && (!parentId || !SNOWFLAKE.test(parentId)))
+      throw new BadGatewayException('Discord returned an invalid thread parent.');
+    const get = (path: string, allowMissing = false) =>
+      this.client.get(access.credential, path, allowMissing);
 
     const includeStarter =
       isThread && parentId && !cursor && !isSearch && (options.limit ?? PAGE_SIZE) > 1;
@@ -92,14 +164,14 @@ export class DiscordConnector implements SourceConnector {
     if (isSearch) {
       const { params, offset, limit } = discordSearchParams(channelId, options);
       const result = discordSearchPage(
-        await this.get(`/guilds/${guildId}/messages/search?${params}`),
+        await get(`/guilds/${guildId}/messages/search?${params}`),
         offset,
         limit,
       );
       raw = result.messages;
       nextCursor = result.nextCursor;
     } else {
-      raw = await this.get(
+      raw = await get(
         `/channels/${channelId}/messages?limit=${pageSize}${cursor ? `&before=${cursor}` : ''}`,
       );
       nextCursor =
@@ -114,9 +186,9 @@ export class DiscordConnector implements SourceConnector {
     // A public thread's starter may live in its parent channel. It is offered for
     // selection, never silently added to the imported conversation.
     if (includeStarter) {
-      const parent = object(await this.get(`/channels/${parentId}`));
+      const parent = object(await get(`/channels/${parentId}`));
       if (parent.type === 0 || parent.type === 5) {
-        const starter = await this.get(`/channels/${parentId}/messages/${channelId}`, true);
+        const starter = await get(`/channels/${parentId}/messages/${channelId}`, true);
         if (starter) messages.push(object(starter));
       }
     }
@@ -170,13 +242,6 @@ export class DiscordConnector implements SourceConnector {
     };
   }
 
-  private allowedChannels(): string[] {
-    return (this.config.get<string>('DISCORD_CHANNEL_IDS') ?? '')
-      .split(',')
-      .map((id) => id.trim())
-      .filter((id) => SNOWFLAKE.test(id));
-  }
-
   private channelId(locator: string, guildId: string): string {
     if (SNOWFLAKE.test(locator)) return locator;
     const match =
@@ -188,50 +253,5 @@ export class DiscordConnector implements SourceConnector {
         'Enter a channel ID or link from the configured Discord server.',
       );
     return match[2];
-  }
-
-  private async get(path: string, allowMissing = false): Promise<unknown> {
-    if (Date.now() < this.retryAt) this.rateLimited();
-    try {
-      const response = await fetch(`https://discord.com/api/v10${path}`, {
-        headers: { Authorization: `Bot ${this.config.get<string>('DISCORD_BOT_TOKEN')}` },
-        signal: AbortSignal.timeout(10_000),
-        redirect: 'error',
-      });
-      if (response.status === 429) {
-        const body = object(await response.json());
-        const delay = Number(response.headers.get('retry-after') ?? body.retry_after);
-        this.retryAt = Date.now() + (Number.isFinite(delay) && delay > 0 ? delay : 5) * 1000;
-        this.rateLimited();
-      }
-      if (response.status === 401 || response.status === 403)
-        throw new ForbiddenException(
-          'Check the Discord bot token, View Channels and Read Message History permissions.',
-        );
-      if (response.status === 404) {
-        if (allowMissing) return null;
-        throw new NotFoundException('Discord channel not found or not accessible to the bot.');
-      }
-      if (response.status === 202)
-        throw new ServiceUnavailableException(
-          'Discord is preparing its search index. Try searching again shortly; your selection is unchanged.',
-        );
-      if (!response.ok)
-        throw new ServiceUnavailableException('Discord is unavailable. Try again later.');
-      return await response.json();
-    } catch (error) {
-      if (error instanceof HttpException) throw error;
-      throw new ServiceUnavailableException(
-        'Could not read Discord. Check the connection and try again.',
-      );
-    }
-  }
-
-  private rateLimited(): never {
-    const retryAfter = Math.max(1, Math.ceil((this.retryAt - Date.now()) / 1000));
-    throw new HttpException(
-      { message: `Discord rate limit reached. Try again in ${retryAfter} seconds.`, retryAfter },
-      429,
-    );
   }
 }
