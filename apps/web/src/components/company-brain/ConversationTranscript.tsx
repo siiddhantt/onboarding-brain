@@ -104,7 +104,7 @@ export function ConversationTranscript({ turns, onOpenDirectory }: ConversationT
                       )}
                     </div>
                   </div>
-                  <AnswerSourcesDisclosure citations={turn.response.citations} verb="checked" />
+                  <AnswerSourcesDisclosure citations={turn.response.citations} />
                 </div>
               )}
 

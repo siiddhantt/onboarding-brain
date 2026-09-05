@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 
 interface AnswerSourcesDisclosureProps {
   citations: CompanyBrainCitation[];
-  verb?: 'used' | 'checked';
 }
 
 function SourceExcerpt({ citation }: { citation: CompanyBrainCitation }) {
@@ -39,15 +38,12 @@ function SourceExcerpt({ citation }: { citation: CompanyBrainCitation }) {
   );
 }
 
-export function AnswerSourcesDisclosure({
-  citations,
-  verb = 'used',
-}: AnswerSourcesDisclosureProps) {
+export function AnswerSourcesDisclosure({ citations }: AnswerSourcesDisclosureProps) {
   if (citations.length === 0) {
     return null;
   }
 
-  const sourceLabel = `${citations.length} ${citations.length === 1 ? 'source' : 'sources'} ${verb}`;
+  const sourceLabel = `${citations.length} ${citations.length === 1 ? 'source' : 'sources'}`;
 
   return (
     <details className="group mt-5 border-t pt-3">
