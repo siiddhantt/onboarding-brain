@@ -1,6 +1,6 @@
 # @app-starter/web
 
-Next.js frontend application for the App Starter multi-tenant SaaS starter.
+Next.js frontend for Onboarding Brain. Start with the [local setup and demo](../../README.md).
 
 ## Tech Stack
 

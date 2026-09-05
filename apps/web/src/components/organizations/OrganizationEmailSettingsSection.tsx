@@ -85,7 +85,7 @@ export function OrganizationEmailSettingsSection({
               id="email-sender-name"
               value={emailSenderName}
               onChange={(e) => setEmailSenderName(e.target.value)}
-              placeholder="e.g. Acme People Team"
+              placeholder="e.g. People Operations"
               maxLength={100}
             />
             <p className="text-xs text-muted-foreground">

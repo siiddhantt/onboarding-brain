@@ -1,13 +1,12 @@
 name: Feature request
-description: Suggest something the starter should include
+description: Suggest an improvement to Onboarding Brain
 labels: [enhancement]
 body:
   - type: markdown
     attributes:
       value: |
-        This is a starter, so the bar is "most projects building on it would
-        want this". Anything narrower is usually better as a fork or a recipe
-        in the docs.
+        Describe who needs this and how it improves their onboarding workflow.
+        Link the relevant PRD section or community discussion when available.
 
   - type: textarea
     id: problem
@@ -33,5 +32,4 @@ body:
     attributes:
       label: Scope
       options:
-        - label: I think most projects using this starter would want it
         - label: I would be willing to open a pull request for it

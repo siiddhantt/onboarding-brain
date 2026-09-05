@@ -120,7 +120,7 @@ for everyone else.
 
 ### The seeded accounts do not work
 
-Re-seed. It upserts, so it is safe to repeat:
+Seed any missing demo accounts:
 
 ```bash
 pnpm --filter @app-starter/api run prisma:seed
@@ -130,6 +130,9 @@ pnpm --filter @app-starter/api run prisma:seed
 owner@example.com  / Password123!   (also a global admin)
 member@example.com / Password123!
 ```
+
+Re-seeding preserves existing passwords and account settings. If you changed a
+demo password, use the password reset flow and open the link in Mailpit.
 
 ---
 

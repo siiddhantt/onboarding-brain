@@ -6,15 +6,16 @@ in a pull request, and the conventions the codebase follows.
 ## Getting set up
 
 ```bash
-git clone <your-fork>
-cd app-starter
+git clone <your-fork-url> onboarding-brain
+cd onboarding-brain
 pnpm bootstrap
 pnpm dev
 ```
 
 `pnpm bootstrap` copies the env files, starts Postgres, Redis, and Mailpit,
-applies migrations, and seeds demo data. It is safe to re-run — it never
-overwrites an existing env file.
+applies migrations, and seeds Northstar Studio. Re-running it preserves existing
+env files, passwords, and configuration. The [README](README.md) has the demo
+accounts and a short walkthrough.
 
 You need Node 22+, pnpm 8+, and Docker (or Podman). You do **not** need any
 third-party accounts — Postgres, Redis, and Mailpit all run locally, and every

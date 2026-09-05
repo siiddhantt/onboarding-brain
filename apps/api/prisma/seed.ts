@@ -1,14 +1,10 @@
 /**
- * Development seed.
- *
- * Creates one demo organization with members, departments, contacts, and two projects.
- *
- * Idempotent — safe to run repeatedly. Records upsert on their natural keys,
- * so re-running updates rather than duplicates.
+ * Local demo: Northstar Studio, two accounts, and a department directory.
+ * Creates missing records without resetting existing passwords or configuration.
  *
  *   pnpm --filter @app-starter/api prisma:seed
  */
-import { PrismaClient, OrgRole, ProjectVisibility } from '@prisma/client';
+import { PrismaClient, OrgRole } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
@@ -54,8 +50,8 @@ async function seedDemoOrganization() {
     create: {
       email: 'owner@example.com',
       password: passwordHash,
-      name: 'Ada Owner',
-      username: 'ada',
+      name: 'Maya Chen',
+      username: 'maya',
       emailVerifiedAt: new Date(),
       isGlobalAdmin: true,
     },
@@ -67,19 +63,19 @@ async function seedDemoOrganization() {
     create: {
       email: 'member@example.com',
       password: passwordHash,
-      name: 'Mo Member',
-      username: 'mo',
+      name: 'Sam Rivera',
+      username: 'sam',
       emailVerifiedAt: new Date(),
     },
   });
 
   const organization = await prisma.organization.upsert({
-    where: { slug: 'acme' },
+    where: { slug: 'northstar-studio' },
     update: {},
     create: {
-      name: 'Acme Inc',
-      slug: 'acme',
-      description: 'Demo organization created by the seed script.',
+      name: 'Northstar Studio',
+      slug: 'northstar-studio',
+      description: 'A fictional design studio for exploring employee onboarding.',
       timezone: 'UTC',
     },
   });
@@ -91,7 +87,7 @@ async function seedDemoOrganization() {
   ] as const) {
     const membership = await prisma.organizationMember.upsert({
       where: { userId_organizationId: { userId: user.id, organizationId: organization.id } },
-      update: { role },
+      update: {},
       create: { userId: user.id, organizationId: organization.id, role },
     });
     memberships.set(user.id, membership.id);
@@ -120,11 +116,7 @@ async function seedDemoOrganization() {
           slug: departmentData.slug,
         },
       },
-      update: {
-        name: departmentData.name,
-        description: departmentData.description,
-        archivedAt: null,
-      },
+      update: {},
       create: {
         organizationId: organization.id,
         slug: departmentData.slug,
@@ -153,32 +145,7 @@ async function seedDemoOrganization() {
     });
   }
 
-  const projects = [
-    {
-      slug: 'website-redesign',
-      name: 'Website redesign',
-      description: 'Visible to everyone in the organization.',
-      visibility: ProjectVisibility.ORGANIZATION,
-    },
-    {
-      slug: 'q3-planning',
-      name: 'Q3 planning',
-      description: "Private to its creator — won't appear for other members.",
-      visibility: ProjectVisibility.PRIVATE,
-    },
-  ];
-
-  for (const project of projects) {
-    await prisma.project.upsert({
-      where: { organizationId_slug: { organizationId: organization.id, slug: project.slug } },
-      update: {},
-      create: { ...project, organizationId: organization.id, createdById: owner.id },
-    });
-  }
-
-  console.log(
-    `Seeded organization "${organization.name}" with 2 users, 2 departments, and 2 projects`,
-  );
+  console.log(`Demo ready: ${organization.name} · 2 accounts · 2 departments`);
   console.log(`  owner@example.com / ${DEMO_PASSWORD}  (global admin)`);
   console.log(`  member@example.com / ${DEMO_PASSWORD}`);
 }

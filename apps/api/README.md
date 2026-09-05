@@ -1,6 +1,6 @@
 # @app-starter/api
 
-NestJS backend API for the App Starter multi-tenant SaaS starter.
+NestJS API for Onboarding Brain. Start with the [local setup and demo](../../README.md).
 
 ## Tech Stack
 
@@ -82,8 +82,8 @@ SMTP_HOST=localhost
 SMTP_PORT=1025
 SMTP_USER=
 SMTP_PASSWORD=
-SMTP_FROM_EMAIL=noreply@app-starter.local
-SMTP_FROM_NAME=App Starter
+SMTP_FROM_EMAIL=noreply@onboarding-brain.local
+SMTP_FROM_NAME=Onboarding Brain
 
 # Note: When running the API inside Docker, use SMTP_HOST=mailpit
 # When running locally, use SMTP_HOST=localhost

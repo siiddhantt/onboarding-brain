@@ -3,22 +3,24 @@
 An open-source employee onboarding Q&A app powered by
 [Cognee](https://www.cognee.ai/).
 
-Employees ask questions against their company's approved knowledge. Answers
-include supporting sources; when the available evidence is insufficient, the
-app does not guess. Organization owners can manage knowledge sources,
-departments, and the people who may handle unanswered questions later.
+Employees ask questions against documents uploaded by their organization.
+Answers include retrieved sources, with a no-answer state when supporting
+evidence is missing. Owners and admins manage knowledge sources, departments,
+and contacts.
 
 ## Current scope
 
 - Multi-tenant organizations, roles, invites, and domain verification
 - Organization-isolated Cognee datasets
 - PDF, DOCX, TXT, Markdown, and HTML ingestion
+- Source replacement and removal, with version and indexing status
 - Grounded Q&A with citations and a no-answer state
 - Department and contact configuration
 - Cognee Cloud and embedded SDK adapters behind one provider-neutral interface
 
-Expert routing and external source connectors such as Discord are not yet
-implemented.
+This is a community prototype. Discord ingestion, expert handoff, and approval
+workflows are next steps. Indexing runs synchronously, and conversations are
+kept only in the current page session.
 
 ## Stack
 
@@ -45,12 +47,17 @@ pnpm dev
 | API documentation | http://localhost:3001/api/docs |
 | Development inbox | http://localhost:8025          |
 
-The seed creates two local users:
+The seed creates **Northstar Studio**, a fictional workspace with two accounts
+and contacts for People Operations and Finance. Both accounts use `Password123!`.
 
-```text
-owner@example.com  / Password123!
-member@example.com / Password123!
-```
+| Account                           | Role                      | What to try                                               |
+| --------------------------------- | ------------------------- | --------------------------------------------------------- |
+| `owner@example.com` — Maya Chen   | Owner; local global admin | Upload, replace, and remove sources; manage the directory |
+| `member@example.com` — Sam Rivera | Member                    | Ask questions, read sources, and find department contacts |
+
+Seeding creates missing records without resetting existing passwords or
+configuration. It makes no Cognee calls. New signups and invitations use the
+development inbox above.
 
 ## Connect Cognee Cloud
 
@@ -66,8 +73,14 @@ COGNEE_DATASET_PREFIX=organization
 
 Never commit the API key. Environment files are ignored by Git.
 
-Upload [`examples/acme-expense-policy.md`](examples/acme-expense-policy.md),
-then ask: “How do employees submit an expense report, and who approves it?”
+Sign in as the owner and open **Northstar Studio → Company brain → Knowledge**.
+Upload [`examples/northstar-expense-policy.md`](examples/northstar-expense-policy.md),
+wait for **Ready**, then open **Ask** and try:
+“How do employees submit an expense report, and who approves it?”
+
+Use the source's menu to replace it with an edited copy or remove it. Sign in as
+the member to check the read-only experience. Cognee ingestion and questions
+use your configured account; they are not mocked.
 
 The API derives the dataset from the authenticated organization. Browser
 clients cannot select another dataset. See

@@ -50,7 +50,8 @@ body:
         - Web (apps/web)
         - Database / migrations
         - Auth
-        - Billing / entitlements
+        - Knowledge sources / Q&A
+        - Departments / contacts
         - Build, tooling, or CI
         - Not sure
 

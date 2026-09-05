@@ -15,15 +15,14 @@ Include what you can:
 - Affected versions or commit
 - Any mitigation you have already found
 
-You should get an acknowledgement within a few days. We will let you know
-whether the report is accepted, and tell you when a fix ships. If you would
-like credit in the advisory, say so and how you want to be named.
+Use the private report to discuss impact, mitigation, and any fix. If you would
+like credit in an advisory, say so and how you want to be named.
 
 ## Scope
 
-This is a starter template. Most deployments will have modified it, so the
-security of your own deployment is yours to own. Reports are most useful when
-they concern code in this repository rather than a misconfiguration of a fork.
+This is a community prototype, not a production-hardened deployment. Reports
+are most useful when they concern code in this repository rather than a
+misconfiguration of a deployment.
 
 Particularly worth reporting:
 

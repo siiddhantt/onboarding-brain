@@ -1,6 +1,6 @@
 # Integrations
 
-Every external service this starter talks to, what it needs, and what happens
+Every external service Onboarding Brain talks to, what it needs, and what happens
 without it.
 
 `pnpm bootstrap` gets you a working local stack with none of the third-party
@@ -64,9 +64,14 @@ connectors do not depend on provider response types. See
 [ADR 0010](adr/0010-provider-neutral-knowledge-engine.md).
 
 For both providers, the API derives the dataset name from the authenticated
-organization ID. Clients cannot supply a dataset. Owners and admins may upload
-documents up to 10 MB; all organization members may ask questions and view
-sources. Provider errors are not exposed to clients.
+organization ID. Clients cannot supply a dataset. Owners and admins may upload,
+replace, and remove documents up to 10 MB; all organization members may ask
+questions and view sources. Provider errors are not exposed to clients.
+
+Replacement retains the application's source ID and increments its version.
+Removal deletes the provider item before archiving its local record. These
+operations run synchronously; interrupted operations can require reconciliation.
+See [ADR 0012](adr/0012-manage-knowledge-source-lifecycle-in-the-application.md).
 
 Official references: [Cognee Cloud API keys](https://docs.cognee.ai/cognee-cloud/ui/api-keys),
 [data ingestion](https://docs.cognee.ai/cognee-cloud/functionality/data-ingestion),
@@ -170,8 +175,8 @@ SMTP_HOST=localhost
 SMTP_PORT=1025
 SMTP_USER=
 SMTP_PASSWORD=
-SMTP_FROM_EMAIL=noreply@app-starter.local
-SMTP_FROM_NAME=App Starter
+SMTP_FROM_EMAIL=noreply@onboarding-brain.local
+SMTP_FROM_NAME=Onboarding Brain
 ```
 
 **Local:** [Mailpit](#mailpit-local-email) catches everything, so no

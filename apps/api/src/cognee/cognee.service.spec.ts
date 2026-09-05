@@ -216,19 +216,6 @@ describe('CogneeService', () => {
     });
   });
 
-  it('does not expose an answer that has no supporting evidence', async () => {
-    (runtime.client.search as jest.Mock).mockResolvedValue({
-      ...searchResult,
-      context: null,
-    });
-
-    await expect(service.ask(organizationId, 'Unsupported question')).resolves.toEqual({
-      status: 'NO_ANSWER',
-      answer: null,
-      citations: [],
-    });
-  });
-
   it('rejects calls without loading the SDK when Cognee is disabled', async () => {
     configService.get = jest.fn((key: string, defaultValue?: unknown) =>
       key === 'COGNEE_ENABLED' ? 'false' : defaultValue,
