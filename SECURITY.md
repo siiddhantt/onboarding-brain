@@ -20,9 +20,8 @@ like credit in an advisory, say so and how you want to be named.
 
 ## Scope
 
-This is a community prototype, not a production-hardened deployment. Reports
-are most useful when they concern code in this repository rather than a
-misconfiguration of a deployment.
+Reports should concern exploitable issues in this repository. For deployment
+configuration, see [Before deploying](#before-deploying) below.
 
 Particularly worth reporting:
 
