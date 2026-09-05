@@ -62,7 +62,7 @@ export function UnifiedHeader({
               </div>
               <UserProfileMenu />
             </>
-          ) : (
+          ) : isLoaded ? (
             <>
               <Button asChild size="sm" className="hidden rounded-full md:inline-flex">
                 <Link href={getManagementUrl('/get-started')}>Get started</Link>
@@ -71,7 +71,7 @@ export function UnifiedHeader({
                 <Link href={getManagementUrl('/login')}>Sign in</Link>
               </Button>
             </>
-          )}
+          ) : null}
 
           {showAuthenticatedUI && (
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>

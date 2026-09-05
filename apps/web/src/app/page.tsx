@@ -1,7 +1,6 @@
-import Link from 'next/link';
-import { ArrowRight, FileText, MessageSquareText, Users } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { FileText, MessageSquareText, Users } from 'lucide-react';
 import { WelcomePreview } from '@/components/landing/WelcomePreview';
+import { WelcomeActions } from '@/components/landing/WelcomeActions';
 import { BRAND_NAME } from '@/lib/brand';
 
 export const metadata = {
@@ -29,58 +28,47 @@ const CAPABILITIES = [
 
 export default function HomePage() {
   return (
-    <div className="mx-auto max-w-6xl px-5 pb-8 pt-10 sm:px-8 sm:pt-16 lg:pt-20">
-      <section
-        className="grid items-center gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-16"
-        aria-labelledby="welcome-title"
-      >
-        <div className="space-y-6">
-          <p className="text-sm text-muted-foreground">A little context goes a long way.</p>
-          <h1
-            id="welcome-title"
-            className="font-display text-[clamp(2.25rem,4.5vw,3rem)] font-medium leading-[1.12] tracking-[-0.04em] text-balance"
-          >
-            Find your way.
-            <br />
-            One question at a time.
-          </h1>
-          <p className="max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Turn your team’s documents and shared knowledge into answers you can trace back to the
-            source. For your first day, and every day after.
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button asChild size="lg" className="rounded-full">
-              <Link href="/get-started">
-                Get started
-                <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="ghost" className="rounded-full">
-              <Link href="/login">Open your workspace</Link>
-            </Button>
+    <div className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-6xl flex-col px-5 sm:px-8">
+      <div className="flex flex-1 flex-col justify-center py-[clamp(1rem,3vh,2rem)]">
+        <section
+          className="grid items-center gap-8 md:grid-cols-[1.1fr_1fr] xl:gap-12"
+          aria-labelledby="welcome-title"
+        >
+          <div className="space-y-5">
+            <p className="text-sm text-muted-foreground">A little context goes a long way.</p>
+            <h1
+              id="welcome-title"
+              className="font-display text-[clamp(2.25rem,5.5vh,3rem)] font-medium leading-[1.12] tracking-[-0.04em] text-balance"
+            >
+              Find your way.
+              <br />
+              One question at a time.
+            </h1>
+            <p className="max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg">
+              Turn your team’s documents and shared knowledge into answers you can trace back to the
+              source. For your first day, and every day after.
+            </p>
+            <WelcomeActions />
           </div>
-          <p className="text-xs text-muted-foreground">
-            Already invited? Follow the link in your email.
-          </p>
-        </div>
-        <WelcomePreview />
-      </section>
+          <WelcomePreview />
+        </section>
 
-      <section
-        className="mt-12 grid gap-8 border-t border-border py-10 sm:grid-cols-3 lg:mt-16"
-        aria-label="What you can do"
-      >
-        {CAPABILITIES.map(({ icon: Icon, title, description }) => (
-          <div key={title} className="space-y-3">
-            <Icon className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-            <div className="space-y-2">
-              <h2 className="font-display text-sm font-medium">{title}</h2>
-              <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+        <section
+          className="mt-6 grid gap-6 border-t border-border pt-6 sm:grid-cols-3"
+          aria-label="What you can do"
+        >
+          {CAPABILITIES.map(({ icon: Icon, title, description }) => (
+            <div key={title} className="flex gap-3">
+              <Icon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <div className="space-y-2">
+                <h2 className="font-display text-sm font-medium">{title}</h2>
+                <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+              </div>
             </div>
-          </div>
-        ))}
-      </section>
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6 text-xs text-muted-foreground">
+          ))}
+        </section>
+      </div>
+      <footer className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border py-4 text-xs text-muted-foreground">
         <p>Open source. Built with Cognee.</p>
         <a
           href="https://github.com/siiddhantt/onboarding-brain"

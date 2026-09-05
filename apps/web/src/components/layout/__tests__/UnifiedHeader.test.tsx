@@ -58,5 +58,12 @@ describe('UnifiedHeader', () => {
     render(<UnifiedHeader />);
     expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Get started' })).not.toBeInTheDocument();
+  });
+
+  it('does not show guest actions before auth is loaded', () => {
+    (useAuth as jest.Mock).mockReturnValue({ isLoaded: false, isAuthenticated: false });
+    render(<UnifiedHeader />);
+    expect(screen.queryByRole('link', { name: /Sign in|Get started/ })).not.toBeInTheDocument();
   });
 });

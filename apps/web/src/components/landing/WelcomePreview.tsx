@@ -3,7 +3,7 @@ import { BRAND_NAME, LOGO_PATH } from '@/lib/brand';
 
 /** Illustrative content, not a live answer or a claim about the visitor's company. */
 export const WelcomePreview = () => (
-  <figure className="min-w-0 rounded-2xl border bg-card p-4 shadow-sm sm:p-6">
+  <figure className="min-w-0 rounded-2xl border bg-card p-4 shadow-sm xl:p-6">
     <figcaption className="flex items-center justify-between gap-3 border-b pb-4 text-xs text-muted-foreground">
       <span className="flex items-center gap-2 font-medium text-foreground">
         <img src={LOGO_PATH} alt="" width={24} height={24} />
@@ -11,7 +11,7 @@ export const WelcomePreview = () => (
       </span>
       <span>Example</span>
     </figcaption>
-    <div className="space-y-6 py-6 text-sm leading-relaxed sm:py-8">
+    <div className="space-y-5 py-5 text-sm leading-relaxed">
       <p className="ml-auto w-fit max-w-[90%] rounded-2xl rounded-br-sm bg-muted/60 px-4 py-3">
         How do I get access to the tools I need?
       </p>
